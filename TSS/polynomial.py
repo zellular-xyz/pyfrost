@@ -2,6 +2,7 @@ from ecpy.curves import Curve
 from ecpy.keys import ECPublicKey, ECPrivateKey
 
 import secrets
+from typing import List
 
 class Polynomial:
     """
@@ -36,7 +37,7 @@ class Polynomial:
         """
         self.threshold: int = threshold
         self.curve: Curve = curve
-        self.coefficients: list[ECPrivateKey] = []
+        self.coefficients: List[ECPrivateKey] = []
         
         # If an initial coefficient is provided, convert it to an integer from a hex string if necessary
         # and add it as the first coefficient of the polynomial.
@@ -74,7 +75,7 @@ class Polynomial:
         # Return the result as an elliptic curve private key.
         return ECPrivateKey(result, self.curve)
 
-    def coef_pub_keys(self) -> list[ECPublicKey]:
+    def coef_pub_keys(self) -> List[ECPublicKey]:
         """
         Retrieves the public keys corresponding to the private coefficient keys.
 
