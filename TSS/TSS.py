@@ -112,7 +112,7 @@ class TSS:
         return TSS.mod_inverse(denum, TSS.N) * num
 
     @staticmethod
-    def reconstructKey(shares: List[Dict], threshold: int, x: int) -> int:
+    def reconstruct_share(shares: List[Dict], threshold: int, x: int) -> int:
         assert len(shares) == threshold, 'Number of shares must be t.'
         sum = 0
         for j in range(threshold):
