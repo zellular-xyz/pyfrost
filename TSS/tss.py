@@ -235,7 +235,7 @@ class TSS:
         signature_share = (nonce_d.d + nonce_e.d * int.from_bytes(my_row, 'big') -
                            coef * share.d * int.from_bytes(challenge, 'big')) % TSS.N
 
-        return {'i': id, 'signature': signature_share, 'publicKey': TSS.pub_to_code(share.get_public_key())}
+        return {'i': id, 'signature': signature_share, 'public_key': TSS.pub_to_code(share.get_public_key())}
 
     @staticmethod
     def frost_verify_single_signature(id: str, message: str, commitments_list: List[Dict[str, int]], aggregated_public_nonce: Point,
@@ -270,7 +270,7 @@ class TSS:
                     hexstr="0x" + TSS.pub_compress(TSS.code_to_pub(group_key))['x']),
                 TSS.pub_compress(TSS.code_to_pub(group_key))['y_parity'],
                 Web3.to_int(message_hash),
-                TSS.pub_to_code(ECPublicKey(aggregated_public_nonce))
+                TSS.pub_to_addr(ECPublicKey(aggregated_public_nonce))
             ]
         )
 
@@ -319,8 +319,8 @@ class TSS:
                 print(
                     f"Failed to sign. Signature from {sign['i']} is not verified.")
         aggregated_signature = aggregated_signature % TSS.N
-        return {'nonce': TSS.pub_to_code(ECPublicKey(aggregated_public_nonce)), 'PublicKey': TSS.pub_compress(TSS.code_to_pub(group_key)),
-                'signature': aggregated_signature, 'messageHash': message_hash}
+        return {'nonce': TSS.pub_to_addr(ECPublicKey(aggregated_public_nonce)), 'public_key': TSS.pub_compress(TSS.code_to_pub(group_key)),
+                'signature': aggregated_signature, 'message_hash': message_hash}
 
     @staticmethod
     def frost_verify_group_signature(aggregated_signature: Dict) -> bool:
@@ -334,9 +334,9 @@ class TSS:
             ],
             [
                 Web3.to_int(
-                    hexstr='0x' + aggregated_signature['PublicKey']['x']),
-                aggregated_signature['PublicKey']['y_parity'],
-                Web3.to_int(aggregated_signature['messageHash']),
+                    hexstr='0x' + aggregated_signature['public_key']['x']),
+                aggregated_signature['public_key']['y_parity'],
+                Web3.to_int(aggregated_signature['message_hash']),
                 aggregated_signature['nonce']
             ]
         )
@@ -347,12 +347,12 @@ class TSS:
                 TSS.curve.generator),
             TSS.curve.mul_point(
                 int.from_bytes(challenge, 'big'),
-                TSS.pub_decompress(aggregated_signature['PublicKey']).W))
+                TSS.pub_decompress(aggregated_signature['public_key']).W))
         return aggregated_signature['nonce'] == TSS.pub_to_addr(ECPublicKey(point))
 
     @staticmethod
     def generate_hkdf_key(private_key: ECPrivateKey, public_key: ECPublicKey) -> bytes:
-        joint_point = TSS.cv.mul_point(private_key.d, public_key.W)
+        joint_point = TSS.curve.mul_point(private_key.d, public_key.W)
         hkdf = HKDF(algorithm=hashes.SHA256(), length=32,
                     salt=b"", info=b"", backend=default_backend())
         return hkdf.derive(bytes.fromhex(str(TSS.pub_to_code(ECPublicKey(joint_point)))))
