@@ -83,7 +83,7 @@ class TSS:
         return ECPublicKey(publicKey)
 
     @staticmethod
-    def calcPolyPoint(polynomial: List[ECPublicKey], x: int) -> Point:
+    def calc_poly_point(polynomial: List[ECPublicKey], x: int) -> Point:
         x = int(x)
         coefs = []
         for i in range(len(polynomial)):
