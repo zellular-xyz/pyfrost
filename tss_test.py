@@ -36,17 +36,17 @@ def share_keys(private_key, threshold, n, party, polynomial):
             polynomial.append(TSS.generate_random_private())
     shares = []
     for i in party:
-        shares.append({'i': i, 'key': polyval(i, polynomial)})
+        shares.append({'id': i, 'key': polyval(i, polynomial)})
     return {'polynomial': polynomial, 'shares': shares}
 
 
 print('Testing Interpolation Functions ...')
 test_list = []  # filling with [0 , 1 , 2, .... , 49 , N-49 , N- 48 , ... , N-1]
 number_errors = 0
-for i in range(0, 50):
-    test_list.append(i)
-    if i != 0:
-        test_list.append(TSS.N-i)
+for id in range(0, 50):
+    test_list.append(id)
+    if id != 0:
+        test_list.append(TSS.N-id)
 for test in test_list:
     private = ECPrivateKey(test, TSS.curve)
     threshold = 3
@@ -86,7 +86,7 @@ def key_generate(nodes, threshold, private_key=None):
     aggregated_public_key = ECPublicKey(
         TSS.curve.mul_point(n_inverse, public_fx))
     for node in nodes:
-        key_shares.append({'i': node, 'key': ECPrivateKey(sum(
+        key_shares.append({'id': node, 'key': ECPrivateKey(sum(
             f_share[node]) * n_inverse, TSS.curve), 'public_key': aggregated_public_key})  # , 'publicKey' : total_Fx
     return key_shares
 
@@ -122,12 +122,12 @@ for key_share in key_shares:
     share = key_share['key']
     nonce = key_nonces[key_shares.index(key_share)]['key']
     public_nonce = key_nonces[key_shares.index(key_share)]['public_key']
-    signatures.append({'index': key_share['i'], 'sign': TSS.schnorr_sign(
+    signatures.append({'index': key_share['id'], 'sign': TSS.schnorr_sign(
         share, nonce, public_nonce, message_hash)})
 
 public_key = key_shares[0]['public_key']
 print('\nTesting Stinson Schnorr Sign Algorithm ...')
-for i in range(5):
+for id in range(5):
     signates_subset = random.sample(signatures, threshold)
     aggregated_signature = TSS.schnorr_aggregate_signatures(
         threshold, [s['sign'] for s in signates_subset], [s['index'] for s in signates_subset])
@@ -143,36 +143,36 @@ for _ in range(5):
     key_shares_subset = random.sample(key_shares, threshold)
     nodes_subset = []
     for k in key_shares_subset:
-        nodes_subset.append(k['i'])
-    commitments_list = []
+        nodes_subset.append(k['id'])
+    commitments_dict = {}
     private_nonces = []
-    for i in nodes_subset:
+    for id in nodes_subset:
         nonce_d = ECPrivateKey(secrets.randbits(32*8), TSS.curve)
         nonce_e = ECPrivateKey(secrets.randbits(32*8), TSS.curve)
-        private_nonces.append({'i': i, 'd': nonce_d, 'e': nonce_e})
-        commitments_list.append({
-            'i': i,
-            'D': TSS.pub_to_code(nonce_d.get_public_key()),
-            'E': TSS.pub_to_code(nonce_e.get_public_key())
-        })
+        private_nonces.append({'id': id, 'public_nonce_d': nonce_d, 'public_nonce_e': nonce_e})
+        commitments_dict[id] = {
+            'id': id,
+            'public_nonce_d': TSS.pub_to_code(nonce_d.get_public_key()),
+            'public_nonce_e': TSS.pub_to_code(nonce_e.get_public_key())
+        }
     message = 'Hello every body'
     signatures = []
     share_public_keys = {}
     for key_share in key_shares_subset:
-        id = key_share['i']
+        id = key_share['id']
         share = key_share['key']
         group_key = TSS.pub_to_code(key_share['public_key'])
         for nonce in private_nonces:
-            if nonce['i'] == id:
-                nonce_d = nonce['d']
-                nonce_e = nonce['e']
+            if nonce['id'] == id:
+                nonce_d = nonce['public_nonce_d']
+                nonce_e = nonce['public_nonce_e']
         single_signature = TSS.frost_single_sign(
-            id, share, nonce_d, nonce_e, message, commitments_list, group_key)
+            id, share, nonce_d, nonce_e, message, commitments_dict, group_key)
         share_public_keys[id] = TSS.pub_to_code(share.get_public_key())
         signatures.append(single_signature)
 
     group_sign = TSS.frost_aggregate_signatures(
-        signatures, share_public_keys, message, commitments_list, group_key)
+        signatures, share_public_keys, message, commitments_dict, group_key)
     verification = TSS.frost_verify_group_signature(group_sign)
     print(f"Selected Nodes : {nodes_subset} , verified : {verification}")
 

@@ -100,11 +100,11 @@ class TSS:
 
     @staticmethod
     def langrange_coef(index: int, threshold: int, shares: List[Dict], x: int) -> int:
-        x_j = int(shares[index]['i'])
+        x_j = int(shares[index]['id'])
         nums = []
         denums = []
         for k in list(filter(lambda i: i != index, range(0, threshold))):
-            x_k = int(shares[k]['i'])
+            x_k = int(shares[k]['id'])
             nums.append(x - x_k)
             denums.append(x_j - x_k)
         num = math.prod(nums)
@@ -133,7 +133,7 @@ class TSS:
     def schnorr_sign(shared_private_key: ECPrivateKey, nounce_private: ECPrivateKey, nounce_public: ECPublicKey, message: int) -> Dict[str, int]:
         e = int.from_bytes(TSS.schnorr_hash(nounce_public, message), 'big')
         s = (nounce_private.d - e * shared_private_key.d) % TSS.N
-        return {'s': s, 'e': e}
+        return {'s': s, 'public_nonce_e': e}
 
     @staticmethod
     def stringify_signature(signature: Dict[str, int]) -> str:
@@ -147,7 +147,7 @@ class TSS:
         assert len(raw_bytes) == 128, "Invalid schnorr signature string"
         e = '0x' + raw_bytes[0:64]
         s = '0x' + raw_bytes[64:]
-        return {'s': int(s, 16), 'e': int(e, 16)}
+        return {'s': int(s, 16), 'public_nonce_e': int(e, 16)}
 
     @staticmethod
     def schnorr_verify(public_key: ECPublicKey, message: str, signature: str) -> bool:
@@ -157,9 +157,9 @@ class TSS:
             message = int(message)
         assert signature['s'] < TSS.N, 'Signature must be reduced modulo N'
         r_v = TSS.curve.add_point(TSS.curve.mul_point(
-            signature['s'], TSS.curve.generator), TSS.curve.mul_point(signature['e'], public_key.W))
+            signature['s'], TSS.curve.generator), TSS.curve.mul_point(signature['public_nonce_e'], public_key.W))
         e_v = TSS.schnorr_hash(ECPublicKey(r_v), message)
-        return int.from_bytes(e_v, 'big') == signature['e']
+        return int.from_bytes(e_v, 'big') == signature['public_nonce_e']
 
     @staticmethod
     def schnorr_aggregate_signatures(threshold: int, signatures: List[Dict[str, int]], party: List[str]) -> Dict[str, int]:
@@ -168,38 +168,39 @@ class TSS:
 
         for j in range(threshold):
             coef = TSS.langrange_coef(
-                j, threshold, [{'i': i} for i in party], 0)
+                j, threshold, [{'id': i} for i in party], 0)
             aggregated_signature += signatures[j]['s'] * coef
         s = aggregated_signature % TSS.N
-        e = signatures[0]['e']
-        return {'s': s, 'e': e}
+        e = signatures[0]['public_nonce_e']
+        return {'s': s, 'public_nonce_e': e}
 
     @staticmethod
     def frost_single_sign(id: str, share: ECPrivateKey, nonce_d: ECPrivateKey, nonce_e: ECPrivateKey, message: str,
-                          commitments_list: List[Dict[str, int]], group_key: ECPublicKey) -> Dict[str, int]:
+                          commitments_dict: Dict[str, Dict[str, int]], group_key: ECPublicKey) -> Dict[str, int]:
 
-        # commitment = [{i , D(i) , E(i)}] for i in S
+        # commitment = {id: {id , D(i) , E(i)}}
         party = []
         index = 0
         my_row = 0
         aggregated_public_nonce = None
         is_first = True
+        commitments_list = list(commitments_dict.values())
         commitments_hash = Web3.keccak(text=json.dumps(commitments_list))
         message_hash = Web3.keccak(text=message)
 
         for commitment in commitments_list:
-            nonce_d_public = TSS.code_to_pub(commitment['D']).W
-            nonce_e_public = TSS.code_to_pub(commitment['E']).W
+            nonce_d_public = TSS.code_to_pub(commitment['public_nonce_d']).W
+            nonce_e_public = TSS.code_to_pub(commitment['public_nonce_e']).W
             assert TSS.curve.is_on_curve(
-                nonce_d_public), f"Nonce D from Node {commitment['i']} Not on Curve"
+                nonce_d_public), f"Nonce D from Node {commitment['id']} Not on Curve"
             assert TSS.curve.is_on_curve(
-                nonce_e_public), f"Nonce E from Node {commitment['i']} Not on Curve"
+                nonce_e_public), f"Nonce E from Node {commitment['id']} Not on Curve"
 
-            party.append(commitment['i'])
+            party.append(commitment['id'])
 
             row = Web3.solidity_keccak(
                 ['string', 'bytes', 'bytes'],
-                [commitment['i'],  message_hash,  commitments_hash]
+                [commitment['id'],  message_hash,  commitments_hash]
             )
 
             public_nonce = TSS.curve.add_point(nonce_d_public, TSS.curve.mul_point(
@@ -211,7 +212,7 @@ class TSS:
                 aggregated_public_nonce = TSS.curve.add_point(
                     aggregated_public_nonce, public_nonce)
 
-            if (id == commitment['i']):
+            if (id == commitment['id']):
                 my_row = row
                 index = commitments_list.index(commitment)
 
@@ -235,24 +236,25 @@ class TSS:
         signature_share = (nonce_d.d + nonce_e.d * int.from_bytes(my_row, 'big') -
                            coef * share.d * int.from_bytes(challenge, 'big')) % TSS.N
 
-        return {'i': id, 'signature': signature_share, 'public_key': TSS.pub_to_code(share.get_public_key())}
+        return {'id': id, 'signature': signature_share, 'public_key': TSS.pub_to_code(share.get_public_key())}
 
     @staticmethod
-    def frost_verify_single_signature(id: str, message: str, commitments_list: List[Dict[str, int]], aggregated_public_nonce: Point,
+    def frost_verify_single_signature(id: str, message: str, commitments_dict: Dict[str, Dict[str, int]], aggregated_public_nonce: Point,
                                       public_key_share: int, single_signature: Dict[str, int], group_key: ECPublicKey) -> bool:
 
         index = 0
         public_nonce = None
+        commitments_list = list(commitments_dict.values())
         commitments_hash = Web3.keccak(text=json.dumps(commitments_list))
         message_hash = Web3.keccak(text=message)
 
         for commitment in commitments_list:
-            if commitment['i'] == id:
-                nonce_d_public = TSS.code_to_pub(commitment['D']).W
-                nonce_e_public = TSS.code_to_pub(commitment['E']).W
+            if commitment['id'] == id:
+                nonce_d_public = TSS.code_to_pub(commitment['public_nonce_d']).W
+                nonce_e_public = TSS.code_to_pub(commitment['public_nonce_e']).W
                 row = Web3.solidity_keccak(
                     ['string', 'bytes', 'bytes'],
-                    [commitment['i'],  message_hash,  commitments_hash]
+                    [commitment['id'],  message_hash,  commitments_hash]
                 )
                 public_nonce = TSS.curve.add_point(nonce_d_public, TSS.curve.mul_point(
                     int.from_bytes(row, 'big'), nonce_e_public))
@@ -286,21 +288,22 @@ class TSS:
 
     @staticmethod
     def frost_aggregate_signatures(single_signatures: List[Dict[str, int]], public_key_share: ECPublicKey, message: str, 
-                                   commitments_list: List[Dict[str, int]], group_key: ECPublicKey) -> Dict:
+                                   commitments_dict: Dict[str, Dict[str, int]], group_key: ECPublicKey) -> Dict:
 
         aggregated_signature = 0
         aggregated_public_nonce = None
         is_first = True
+        commitments_list = list(commitments_dict.values())
         commitments_hash = Web3.keccak(text=json.dumps(commitments_list))
         message_hash = Web3.keccak(text=message)
 
         for commitment in commitments_list:
-            nonce_d_public = TSS.code_to_pub(commitment['D']).W
-            nonce_e_public = TSS.code_to_pub(commitment['E']).W
+            nonce_d_public = TSS.code_to_pub(commitment['public_nonce_d']).W
+            nonce_e_public = TSS.code_to_pub(commitment['public_nonce_e']).W
 
             row = Web3.solidity_keccak(
                 ['string', 'bytes', 'bytes'],
-                [commitment['i'],  message_hash,  commitments_hash]
+                [commitment['id'],  message_hash,  commitments_hash]
             )
 
             public_nonce = TSS.curve.add_point(nonce_d_public, TSS.curve.mul_point(
@@ -313,11 +316,11 @@ class TSS:
                     aggregated_public_nonce, public_nonce)
 
         for sign in single_signatures:
-            if TSS.frost_verify_single_signature(sign['i'], message, commitments_list, aggregated_public_nonce, public_key_share[sign['i']], sign, group_key):
+            if TSS.frost_verify_single_signature(sign['id'], message, commitments_dict, aggregated_public_nonce, public_key_share[sign['id']], sign, group_key):
                 aggregated_signature = aggregated_signature + sign['signature']
             else:
                 print(
-                    f"Failed to sign. Signature from {sign['i']} is not verified.")
+                    f"Failed to sign. Signature from {sign['id']} is not verified.")
         aggregated_signature = aggregated_signature % TSS.N
         return {'nonce': TSS.pub_to_addr(ECPublicKey(aggregated_public_nonce)), 'public_key': TSS.pub_compress(TSS.code_to_pub(group_key)),
                 'signature': aggregated_signature, 'message_hash': message_hash}
