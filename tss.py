@@ -133,7 +133,7 @@ class TSS:
     def schnorr_sign(shared_private_key: ECPrivateKey, nounce_private: ECPrivateKey, nounce_public: ECPublicKey, message: int) -> Dict[str, int]:
         e = int.from_bytes(TSS.schnorr_hash(nounce_public, message), 'big')
         s = (nounce_private.d - e * shared_private_key.d) % TSS.N
-        return {'s': s, 'public_nonce_e': e}
+        return {'s': s, 'e': e}
 
     @staticmethod
     def stringify_signature(signature: Dict[str, int]) -> str:
@@ -147,7 +147,7 @@ class TSS:
         assert len(raw_bytes) == 128, "Invalid schnorr signature string"
         e = '0x' + raw_bytes[0:64]
         s = '0x' + raw_bytes[64:]
-        return {'s': int(s, 16), 'public_nonce_e': int(e, 16)}
+        return {'s': int(s, 16), 'e': int(e, 16)}
 
     @staticmethod
     def schnorr_verify(public_key: ECPublicKey, message: str, signature: str) -> bool:
@@ -157,9 +157,9 @@ class TSS:
             message = int(message)
         assert signature['s'] < TSS.N, 'Signature must be reduced modulo N'
         r_v = TSS.curve.add_point(TSS.curve.mul_point(
-            signature['s'], TSS.curve.generator), TSS.curve.mul_point(signature['public_nonce_e'], public_key.W))
+            signature['s'], TSS.curve.generator), TSS.curve.mul_point(signature['e'], public_key.W))
         e_v = TSS.schnorr_hash(ECPublicKey(r_v), message)
-        return int.from_bytes(e_v, 'big') == signature['public_nonce_e']
+        return int.from_bytes(e_v, 'big') == signature['e']
 
     @staticmethod
     def schnorr_aggregate_signatures(threshold: int, signatures: List[Dict[str, int]], party: List[str]) -> Dict[str, int]:
@@ -171,8 +171,8 @@ class TSS:
                 j, threshold, [{'id': i} for i in party], 0)
             aggregated_signature += signatures[j]['s'] * coef
         s = aggregated_signature % TSS.N
-        e = signatures[0]['public_nonce_e']
-        return {'s': s, 'public_nonce_e': e}
+        e = signatures[0]['e']
+        return {'s': s, 'e': e}
 
     @staticmethod
     def frost_single_sign(id: str, share: ECPrivateKey, nonce_d: ECPrivateKey, nonce_e: ECPrivateKey, message: str,
