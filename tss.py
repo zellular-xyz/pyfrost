@@ -354,11 +354,31 @@ class TSS:
         return aggregated_signature['nonce'] == TSS.pub_to_addr(ECPublicKey(point))
 
     @staticmethod
-    def generate_hkdf_key(private_key: ECPrivateKey, public_key: ECPublicKey) -> bytes:
-        joint_point = TSS.curve.mul_point(private_key.d, public_key.W)
+    def complaint_sign(private_key : ECPrivateKey , nonce : ECPrivateKey , hash : int):
+        return (nonce.d + private_key.d * hash) % TSS.N 
+    
+    @staticmethod
+    def complaint_verify(public_complaintant : ECPublicKey, public_malicious : ECPublicKey , encryption_key : ECPublicKey , proof , hash : int):
+        public_nonce = proof['public_nonce']
+        public_commitment = proof['commitment']
+        signature = proof['signature']
+        
+        point1 = TSS.curve.add_point(public_nonce.W, TSS.curve.mul_point(hash, public_complaintant.W))
+        point2 = TSS.curve.mul_point(signature, TSS.curve.generator)
+        verification1 = (point1 == point2)
+        
+        point1 = TSS.curve.add_point(public_commitment.W, TSS.curve.mul_point(hash, encryption_key.W))
+        point2 = TSS.curve.mul_point(signature, public_malicious.W)
+        verification2 = (point1 == point2)
+        
+        return verification1 and verification2
+    
+    
+    @staticmethod
+    def generate_hkdf_key(key: int) -> bytes:
         hkdf = HKDF(algorithm=hashes.SHA256(), length=32,
                     salt=b"", info=b"", backend=default_backend())
-        return hkdf.derive(bytes.fromhex(str(TSS.pub_to_code(ECPublicKey(joint_point)))))
+        return hkdf.derive(bytes.fromhex(str(key)))
 
     @staticmethod
     def encrypt(data: str, key: bytes) -> str:

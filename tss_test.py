@@ -184,10 +184,12 @@ for _ in range(10):
     private2 = TSS.generate_random_private()
     public1 = private1.get_public_key()
     public2 = private2.get_public_key()
-    encryption_key = TSS.generate_hkdf_key(private1, public2)
+    joint_key = TSS.pub_to_code(ECPublicKey(TSS.curve.mul_point(private1.d , public2.W)))
+    encryption_key = TSS.generate_hkdf_key(joint_key)
     original_data = {'signature': TSS.generate_random_private().d}
     encrypted_data = TSS.encrypt(original_data, encryption_key)
-    decryption_key = TSS.generate_hkdf_key(private2, public1)
+    joint_key = TSS.pub_to_code(ECPublicKey(TSS.curve.mul_point(private2.d , public1.W)))
+    decryption_key = TSS.generate_hkdf_key(joint_key)
     decrypted_data = TSS.decrypt(encrypted_data, decryption_key)
     if json.loads(decrypted_data) != original_data:
         number_errors = number_errors + 1
