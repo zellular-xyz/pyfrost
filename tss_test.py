@@ -1,11 +1,11 @@
-from ecpy.keys import ECPublicKey, ECPrivateKey
-from web3 import Web3
 from polynomial import Polynomial
+from fastecdsa import keys
+from web3 import Web3
+from tss import TSS
 
 import random
-from tss import TSS
-import secrets
 import json
+
 
 # In this code we will test the functionality of TSS
 # Cryptography Module.
@@ -19,8 +19,8 @@ import json
 def polyval(x, polynomial):
     result = 0
     for i in range(len(polynomial)):
-        result = result + polynomial[i].d * pow(x, i)
-    return ECPrivateKey(result % TSS.N, TSS.curve)
+        result = result + polynomial[i] * pow(x, i)
+    return result % TSS.N
 
 
 def share_keys(private_key, threshold, n, party, polynomial):
@@ -41,14 +41,12 @@ def share_keys(private_key, threshold, n, party, polynomial):
 
 
 print('Testing Interpolation Functions ...')
-test_list = []  # filling with [0 , 1 , 2, .... , 49 , N-49 , N- 48 , ... , N-1]
+test_list = []  # filling with [1 , 2, .... , 50 , N-50 , N- 49 , ... , N-1]
 number_errors = 0
-for id in range(0, 50):
-    test_list.append(id)
-    if id != 0:
-        test_list.append(TSS.N-id)
-for test in test_list:
-    private = ECPrivateKey(test, TSS.curve)
+for i in range(1, 51):
+    test_list.append(i)
+    test_list.append(TSS.N-i)
+for private in test_list:
     threshold = 3
     number_of_nodes = 5
     share_key = share_keys(private, threshold, number_of_nodes, [], [])
@@ -56,10 +54,10 @@ for test in test_list:
     shares = share_key['shares']
     threshold_shares1 = random.sample(shares, threshold)
     generated_key1 = TSS.reconstruct_share(threshold_shares1, threshold, 0)
-    if (generated_key1 != test):
+    if (generated_key1 != private):
         number_errors = number_errors + 1
         print('Error at Test ShareKey & ReconstructKey Functions by PrivateKey:')
-        print(test)
+        print(private)
 print(f'Find {number_errors} errors from {len(test_list)} tests')
 
 ################# Test Key Generation Logic #################
@@ -70,24 +68,22 @@ def key_generate(nodes, threshold, private_key=None):
     f_share = {}
     public_keys = []
     for node in nodes:
-        fx = Polynomial(threshold, TSS.curve, private_key)
+        fx = Polynomial(threshold, TSS.ecurve, private_key)
         functions.append(fx)
-
         public_keys.append(fx.coef_pub_keys()[0])
         f_share[node] = []
     for node in nodes:
         for fx in functions:
-            f_share[node].append(fx.evaluate(node).d)
+            f_share[node].append(fx.evaluate(node))
     key_shares = []
-    public_fx = public_keys[0].W
+    public_fx = public_keys[0]
     for i in range(1, len(public_keys)):
-        public_fx = TSS.curve.add_point(public_fx, public_keys[i].W)
+        public_fx = public_fx + public_keys[i]
     n_inverse = TSS.mod_inverse(len(nodes), TSS.N)
-    aggregated_public_key = ECPublicKey(
-        TSS.curve.mul_point(n_inverse, public_fx))
+    aggregated_public_key = n_inverse * public_fx
     for node in nodes:
-        key_shares.append({'id': node, 'key': ECPrivateKey(sum(
-            f_share[node]) * n_inverse, TSS.curve), 'public_key': aggregated_public_key})  # , 'publicKey' : total_Fx
+        key_shares.append({'id': node, 'key': sum(
+            f_share[node]) * n_inverse, 'public_key': aggregated_public_key})  # , 'publicKey' : total_Fx
     return key_shares
 
 
@@ -147,19 +143,19 @@ for _ in range(5):
     commitments_dict = {}
     private_nonces = []
     for id in nodes_subset:
-        nonce_d = ECPrivateKey(secrets.randbits(32*8), TSS.curve)
-        nonce_e = ECPrivateKey(secrets.randbits(32*8), TSS.curve)
-        private_nonces.append({'id': id, 'public_nonce_d': nonce_d, 'public_nonce_e': nonce_e})
+        nonce_d, public_nonce_d = keys.gen_keypair(TSS.ecurve)
+        nonce_e, public_nonce_e = keys.gen_keypair(TSS.ecurve)
+        private_nonces.append({'id': int(id), 'public_nonce_d': nonce_d, 'public_nonce_e': nonce_e})
         commitments_dict[id] = {
-            'id': id,
-            'public_nonce_d': TSS.pub_to_code(nonce_d.get_public_key()),
-            'public_nonce_e': TSS.pub_to_code(nonce_e.get_public_key())
+            'id': int(id),
+            'public_nonce_d': TSS.pub_to_code(public_nonce_d),
+            'public_nonce_e': TSS.pub_to_code(public_nonce_e)
         }
     message = 'Hello every body'
     signatures = []
     share_public_keys = {}
     for key_share in key_shares_subset:
-        id = key_share['id']
+        id = int(key_share['id'])
         share = key_share['key']
         group_key = TSS.pub_to_code(key_share['public_key'])
         for nonce in private_nonces:
@@ -168,7 +164,7 @@ for _ in range(5):
                 nonce_e = nonce['public_nonce_e']
         single_signature = TSS.frost_single_sign(
             id, share, nonce_d, nonce_e, message, commitments_dict, group_key)
-        share_public_keys[id] = TSS.pub_to_code(share.get_public_key())
+        share_public_keys[id] = TSS.pub_to_code(keys.get_public_key(share , TSS.ecurve))
         signatures.append(single_signature)
 
     group_sign = TSS.frost_aggregate_signatures(
@@ -180,15 +176,13 @@ for _ in range(5):
 number_errors = 0
 print('\nTesting Encryption Methods ...')
 for _ in range(10):
-    private1 = TSS.generate_random_private()
-    private2 = TSS.generate_random_private()
-    public1 = private1.get_public_key()
-    public2 = private2.get_public_key()
-    joint_key = TSS.pub_to_code(ECPublicKey(TSS.curve.mul_point(private1.d , public2.W)))
+    private1, public1 = keys.gen_keypair(TSS.ecurve)
+    private2, public2 = keys.gen_keypair(TSS.ecurve)
+    joint_key = TSS.pub_to_code(private1 * public2)
     encryption_key = TSS.generate_hkdf_key(joint_key)
-    original_data = {'signature': TSS.generate_random_private().d}
+    original_data = {'signature': TSS.generate_random_private()}
     encrypted_data = TSS.encrypt(original_data, encryption_key)
-    joint_key = TSS.pub_to_code(ECPublicKey(TSS.curve.mul_point(private2.d , public1.W)))
+    joint_key = TSS.pub_to_code(private2 * public1)
     decryption_key = TSS.generate_hkdf_key(joint_key)
     decrypted_data = TSS.decrypt(encrypted_data, decryption_key)
     if json.loads(decrypted_data) != original_data:
