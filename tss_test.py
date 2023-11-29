@@ -1,7 +1,14 @@
+<<<<<<< HEAD
 from new_polynomial import Polynomial
 from fastecdsa import keys
 from web3 import Web3
 from new_tss import TSS
+=======
+from polynomial import Polynomial
+from fastecdsa import keys
+from web3 import Web3
+from tss import TSS
+>>>>>>> 871bc8a5eb6ba86c6d1c0dc3fd4fb5d96e72cc95
 
 import random
 import json

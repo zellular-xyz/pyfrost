@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 from fastecdsa import keys
+=======
+from fastecdsa import keys , curve
+>>>>>>> 871bc8a5eb6ba86c6d1c0dc3fd4fb5d96e72cc95
 
 from ecpy.curves import Curve
 from fastecdsa.point import Point
