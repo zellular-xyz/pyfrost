@@ -166,10 +166,17 @@ for _ in range(5):
             id, share, nonce_d, nonce_e, message, commitments_dict, group_key)
         share_public_keys[id] = TSS.pub_to_code(keys.get_public_key(share , TSS.ecurve))
         signatures.append(single_signature)
-
-    group_sign = TSS.frost_aggregate_signatures(
-        signatures, share_public_keys, message, commitments_dict, group_key)
-    verification = TSS.frost_verify_group_signature(group_sign)
+    group_nonce = TSS.frost_aggregate_nonce(message , commitments_dict , group_key)
+    verification = True
+    for single_signature in signatures:
+        if not TSS.frost_verify_single_signature(single_signature['id'] , message , commitments_dict , group_nonce , share_public_keys[single_signature['id']] , single_signature , group_key):
+            verification = False
+            break
+    if verification:
+        group_sign = TSS.frost_aggregate_signatures(message, signatures , group_nonce , group_key)
+        group_verification = TSS.frost_verify_group_signature(group_sign)
+    else:
+        group_verification = False
     print(f"Selected Nodes : {nodes_subset} , verified : {verification}")
 
 ################### Test Encryption Logic ###################

@@ -286,10 +286,7 @@ class TSS:
         return point1 == point2
 
     @staticmethod
-    def frost_aggregate_signatures(single_signatures: List[Dict[str, int]], public_key_shares: Dict[str, int], message: str, 
-                                   commitments_dict: Dict[str, Dict[str, int]], group_key: Point) -> Dict:
-
-        aggregated_signature = 0
+    def frost_aggregate_nonce(message: str, commitments_dict: Dict[str, Dict[str, int]], group_key: Point):
         aggregated_public_nonce = None
         is_first = True
         commitments_list = list(commitments_dict.values())
@@ -311,13 +308,14 @@ class TSS:
                 is_first = False
             else:
                 aggregated_public_nonce = aggregated_public_nonce + public_nonce
-
+        return aggregated_public_nonce
+    
+    @staticmethod
+    def frost_aggregate_signatures(message: str, single_signatures: List[Dict[str, int]], aggregated_public_nonce : Point, group_key: Point) -> Dict:
+        message_hash = Web3.keccak(text=message)
+        aggregated_signature = 0
         for sign in single_signatures:
-            if TSS.frost_verify_single_signature(sign['id'], message, commitments_dict, aggregated_public_nonce, public_key_shares[sign['id']], sign, group_key):
-                aggregated_signature = aggregated_signature + sign['signature']
-            else:
-                print(
-                    f"Failed to sign. Signature from {sign['id']} is not verified.")
+            aggregated_signature = aggregated_signature + sign['signature']
         aggregated_signature = aggregated_signature % TSS.N
         return {'nonce': TSS.pub_to_addr(aggregated_public_nonce), 'public_key': TSS.pub_compress(TSS.code_to_pub(group_key)),
                 'signature': aggregated_signature, 'message_hash': message_hash}
