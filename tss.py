@@ -235,11 +235,11 @@ class TSS:
         coef = TSS.langrange_coef(index, len(party), commitments_list, 0)
         signature_share = (nonce_d + nonce_e * int.from_bytes(my_row, 'big') -
                            coef * share * int.from_bytes(challenge, 'big')) % TSS.N
-
         return {
             'id': id, 
             'signature': signature_share, 
-            'public_key': TSS.pub_to_code(keys.get_public_key(share , TSS.ecurve))
+            'public_key': TSS.pub_to_code(keys.get_public_key(share , TSS.ecurve)),
+            'aggregated_public_nonce': TSS.pub_to_code(aggregated_public_nonce)
             }
 
     @staticmethod
