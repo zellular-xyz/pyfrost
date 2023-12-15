@@ -278,13 +278,13 @@ class FROST:
             'proof' : complaint_pop
         }
 
-    def sign(self, commitments_dict, message , common_data : Dict):
+    def sign(self, commitments_dict, message: str , nonces : Dict):
         assert type(message) == str, 'Message should be from string type.'
         nonce_d = 0
         nonce_e = 0
         signature = None
         nonce = commitments_dict[self.node_id]
-        for pair in common_data['nonces']:
+        for pair in nonces:
             nonce_d = pair['nonce_d_pair'].get(nonce['public_nonce_d'])
             nonce_e = pair['nonce_e_pair'].get(nonce['public_nonce_e'])
             if nonce_d is None and nonce_e is None:
