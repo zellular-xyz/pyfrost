@@ -1,7 +1,7 @@
 from polynomial import Polynomial
 from fastecdsa import keys
 from web3 import Web3
-from tss import TSS
+from tss import Tss
 
 import random
 import json
@@ -20,7 +20,7 @@ def polyval(x, polynomial):
     result = 0
     for i in range(len(polynomial)):
         result = result + polynomial[i] * pow(x, i)
-    return result % TSS.N
+    return result % Tss.N
 
 
 def share_keys(private_key, threshold, n, party, polynomial):
@@ -33,7 +33,7 @@ def share_keys(private_key, threshold, n, party, polynomial):
     else:
         polynomial = [private_key]
         for i in range(threshold-1):
-            polynomial.append(TSS.generate_random_private())
+            polynomial.append(Tss.generate_random_private())
     shares = []
     for i in party:
         shares.append({'id': i, 'key': polyval(i, polynomial)})
@@ -45,7 +45,7 @@ test_list = []  # filling with [1 , 2, .... , 50 , N-50 , N- 49 , ... , N-1]
 number_errors = 0
 for i in range(1, 51):
     test_list.append(i)
-    test_list.append(TSS.N-i)
+    test_list.append(Tss.N-i)
 for private in test_list:
     threshold = 3
     number_of_nodes = 5
@@ -53,7 +53,7 @@ for private in test_list:
     f = share_key['polynomial']
     shares = share_key['shares']
     threshold_shares1 = random.sample(shares, threshold)
-    generated_key1 = TSS.reconstruct_share(threshold_shares1, threshold, 0)
+    generated_key1 = Tss.reconstruct_share(threshold_shares1, threshold, 0)
     if (generated_key1 != private):
         number_errors = number_errors + 1
         print('Error at Test ShareKey & ReconstructKey Functions by PrivateKey:')
@@ -68,7 +68,7 @@ def key_generate(nodes, threshold, private_key=None):
     f_share = {}
     public_keys = []
     for node in nodes:
-        fx = Polynomial(threshold, TSS.ecurve, private_key)
+        fx = Polynomial(threshold, Tss.ecurve, private_key)
         functions.append(fx)
         public_keys.append(fx.coef_pub_keys()[0])
         f_share[node] = []
@@ -79,7 +79,7 @@ def key_generate(nodes, threshold, private_key=None):
     public_fx = public_keys[0]
     for i in range(1, len(public_keys)):
         public_fx = public_fx + public_keys[i]
-    n_inverse = TSS.mod_inverse(len(nodes), TSS.N)
+    n_inverse = Tss.mod_inverse(len(nodes), Tss.N)
     aggregated_public_key = n_inverse * public_fx
     for node in nodes:
         key_shares.append({'id': node, 'key': sum(
@@ -94,9 +94,9 @@ print('\nTesting Key Generation Logic ...')
 for test in test_list:
     key_shares = key_generate(nodes, threshold, test)
     threshold_shares1 = random.sample(key_shares, threshold)
-    generated_key1 = TSS.reconstruct_share(threshold_shares1, threshold, 0)
+    generated_key1 = Tss.reconstruct_share(threshold_shares1, threshold, 0)
     threshold_shares2 = random.sample(key_shares, threshold)
-    generated_key2 = TSS.reconstruct_share(threshold_shares2, threshold, 0)
+    generated_key2 = Tss.reconstruct_share(threshold_shares2, threshold, 0)
     assert generated_key1 == generated_key2, "ERROR: reconstruct key is mismatched"
     if (generated_key1 != test):
         number_of_errors = number_of_errors + 1
@@ -118,16 +118,16 @@ for key_share in key_shares:
     share = key_share['key']
     nonce = key_nonces[key_shares.index(key_share)]['key']
     public_nonce = key_nonces[key_shares.index(key_share)]['public_key']
-    signatures.append({'index': key_share['id'], 'sign': TSS.schnorr_sign(
+    signatures.append({'index': key_share['id'], 'sign': Tss.schnorr_sign(
         share, nonce, public_nonce, message_hash)})
 
 public_key = key_shares[0]['public_key']
 print('\nTesting Stinson Schnorr Sign Algorithm ...')
 for id in range(5):
     signates_subset = random.sample(signatures, threshold)
-    aggregated_signature = TSS.schnorr_aggregate_signatures(
+    aggregated_signature = Tss.schnorr_aggregate_signatures(
         threshold, [s['sign'] for s in signates_subset], [s['index'] for s in signates_subset])
-    verified = TSS.schnorr_verify(
+    verified = Tss.schnorr_verify(
         public_key, message_hash, aggregated_signature)
     print(
         f"Selected Nodes : {[s['index'] for s in signates_subset]} , verified : {verified}")
@@ -143,13 +143,13 @@ for _ in range(5):
     commitments_dict = {}
     private_nonces = []
     for id in nodes_subset:
-        nonce_d, public_nonce_d = keys.gen_keypair(TSS.ecurve)
-        nonce_e, public_nonce_e = keys.gen_keypair(TSS.ecurve)
+        nonce_d, public_nonce_d = keys.gen_keypair(Tss.ecurve)
+        nonce_e, public_nonce_e = keys.gen_keypair(Tss.ecurve)
         private_nonces.append({'id': int(id), 'public_nonce_d': nonce_d, 'public_nonce_e': nonce_e})
         commitments_dict[id] = {
             'id': int(id),
-            'public_nonce_d': TSS.pub_to_code(public_nonce_d),
-            'public_nonce_e': TSS.pub_to_code(public_nonce_e)
+            'public_nonce_d': Tss.pub_to_code(public_nonce_d),
+            'public_nonce_e': Tss.pub_to_code(public_nonce_e)
         }
     message = 'Hello every body'
     signatures = []
@@ -157,24 +157,24 @@ for _ in range(5):
     for key_share in key_shares_subset:
         id = int(key_share['id'])
         share = key_share['key']
-        group_key = TSS.pub_to_code(key_share['public_key'])
+        group_key = Tss.pub_to_code(key_share['public_key'])
         for nonce in private_nonces:
             if nonce['id'] == id:
                 nonce_d = nonce['public_nonce_d']
                 nonce_e = nonce['public_nonce_e']
-        single_signature = TSS.frost_single_sign(
+        single_signature = Tss.frost_single_sign(
             id, share, nonce_d, nonce_e, message, commitments_dict, group_key)
-        share_public_keys[id] = TSS.pub_to_code(keys.get_public_key(share , TSS.ecurve))
+        share_public_keys[id] = Tss.pub_to_code(keys.get_public_key(share , Tss.ecurve))
         signatures.append(single_signature)
-    group_nonce = TSS.frost_aggregate_nonce(message , commitments_dict , group_key)
+    group_nonce = Tss.frost_aggregate_nonce(message , commitments_dict , group_key)
     verification = True
     for single_signature in signatures:
-        if not TSS.frost_verify_single_signature(single_signature['id'] , message , commitments_dict , group_nonce , share_public_keys[single_signature['id']] , single_signature , group_key):
+        if not Tss.frost_verify_single_signature(single_signature['id'] , message , commitments_dict , group_nonce , share_public_keys[single_signature['id']] , single_signature , group_key):
             verification = False
             break
     if verification:
-        group_sign = TSS.frost_aggregate_signatures(message, signatures , group_nonce , group_key)
-        group_verification = TSS.frost_verify_group_signature(group_sign)
+        group_sign = Tss.frost_aggregate_signatures(message, signatures , group_nonce , group_key)
+        group_verification = Tss.frost_verify_group_signature(group_sign)
     else:
         group_verification = False
     print(f"Selected Nodes : {nodes_subset} , verified : {verification}")
@@ -183,15 +183,15 @@ for _ in range(5):
 number_errors = 0
 print('\nTesting Encryption Methods ...')
 for _ in range(10):
-    private1, public1 = keys.gen_keypair(TSS.ecurve)
-    private2, public2 = keys.gen_keypair(TSS.ecurve)
-    joint_key = TSS.pub_to_code(private1 * public2)
-    encryption_key = TSS.generate_hkdf_key(joint_key)
-    original_data = {'signature': TSS.generate_random_private()}
-    encrypted_data = TSS.encrypt(original_data, encryption_key)
-    joint_key = TSS.pub_to_code(private2 * public1)
-    decryption_key = TSS.generate_hkdf_key(joint_key)
-    decrypted_data = TSS.decrypt(encrypted_data, decryption_key)
+    private1, public1 = keys.gen_keypair(Tss.ecurve)
+    private2, public2 = keys.gen_keypair(Tss.ecurve)
+    joint_key = Tss.pub_to_code(private1 * public2)
+    encryption_key = Tss.generate_hkdf_key(joint_key)
+    original_data = {'signature': Tss.generate_random_private()}
+    encrypted_data = Tss.encrypt(original_data, encryption_key)
+    joint_key = Tss.pub_to_code(private2 * public1)
+    decryption_key = Tss.generate_hkdf_key(joint_key)
+    decrypted_data = Tss.decrypt(encrypted_data, decryption_key)
     if json.loads(decrypted_data) != original_data:
         number_errors = number_errors + 1
         print('Original data : ', original_data)

@@ -1,6 +1,6 @@
 import logging
 from fastecdsa import keys
-from tss import TSS, Point
+from tss import Tss, Point
 from polynomial import Polynomial
 from web3 import Web3
 from typing import List, Dict
@@ -20,8 +20,8 @@ class Frost:
         self.status = 'STARTED'
     
     def dkg_round1(self) -> List[Dict]:
-        secret_key, public_key =  keys.gen_keypair(TSS.ecurve)
-        secret_nonce, public_nonce =  keys.gen_keypair(TSS.ecurve)
+        secret_key, public_key =  keys.gen_keypair(Tss.ecurve)
+        secret_nonce, public_nonce =  keys.gen_keypair(Tss.ecurve)
         secret_pop_hash = Web3.solidity_keccak(
             [
                 'string',
@@ -32,26 +32,26 @@ class Frost:
             [
                 self.node_id,
                 self.dkg_id,
-                TSS.pub_to_code(public_key),
-                TSS.pub_to_code(public_nonce)
+                Tss.pub_to_code(public_key),
+                Tss.pub_to_code(public_nonce)
             ],
         )
 
-        secret_pop_sign = TSS.schnorr_sign(
+        secret_pop_sign = Tss.schnorr_sign(
             secret_key, secret_nonce, public_nonce, int.from_bytes(
                 secret_pop_hash, 'big')
         )
 
         secret_signature = {
-            'nonce': TSS.pub_to_code(public_nonce),
-            'signature': TSS.stringify_signature(secret_pop_sign),
+            'nonce': Tss.pub_to_code(public_nonce),
+            'signature': Tss.stringify_signature(secret_pop_sign),
         }
 
         # Generate DKG polynomial
-        fx = Polynomial(self.threshold, TSS.ecurve, self.coefficient0)
+        fx = Polynomial(self.threshold, Tss.ecurve, self.coefficient0)
         public_fx = fx.coef_pub_keys()
         
-        coef0_nonce, public_coef0_nonce = keys.gen_keypair(TSS.ecurve)
+        coef0_nonce, public_coef0_nonce = keys.gen_keypair(Tss.ecurve)
         coef0_pop_hash = Web3.solidity_keccak(
             [
                 'string', 
@@ -62,24 +62,24 @@ class Frost:
             [
                 self.node_id, 
                 self.dkg_id, 
-                TSS.pub_to_code(public_fx[0]), 
-                TSS.pub_to_code(public_coef0_nonce)
+                Tss.pub_to_code(public_fx[0]), 
+                Tss.pub_to_code(public_coef0_nonce)
                 ],
         )
-        coef0_pop_sign = TSS.schnorr_sign(
+        coef0_pop_sign = Tss.schnorr_sign(
             fx.coefficients[0], coef0_nonce, public_coef0_nonce, int.from_bytes(coef0_pop_hash, 'big')
         )
 
         coef0_signature = {
-            'nonce': TSS.pub_to_code(public_coef0_nonce),
-            'signature': TSS.stringify_signature(coef0_pop_sign),
+            'nonce': Tss.pub_to_code(public_coef0_nonce),
+            'signature': Tss.stringify_signature(coef0_pop_sign),
         }
 
         broadcast = {
             'sender_id': self.node_id,
-            'public_fx': [TSS.pub_to_code(s) for s in public_fx],
+            'public_fx': [Tss.pub_to_code(s) for s in public_fx],
             'coefficient0_signature': coef0_signature,
-            'public_key': TSS.pub_to_code(public_key),
+            'public_key': Tss.pub_to_code(public_key),
             'secret_signature': secret_signature
         }
 
@@ -115,8 +115,8 @@ class Frost:
                 [sender_id, self.dkg_id,    sender_public_fx[0],    sender_coef0_nonce]
             )
 
-            coef0_verification = TSS.schnorr_verify(
-                TSS.code_to_pub(sender_public_fx[0]), 
+            coef0_verification = Tss.schnorr_verify(
+                Tss.code_to_pub(sender_public_fx[0]), 
                 int.from_bytes(coef0_pop_hash, 'big'), 
                 sender_coef0_signature
             )
@@ -130,8 +130,8 @@ class Frost:
                 [sender_id, self.dkg_id, sender_public_key, sender_secret_nonce]
             )
 
-            secret_verification = TSS.schnorr_verify(
-                TSS.code_to_pub(sender_public_key), 
+            secret_verification = Tss.schnorr_verify(
+                Tss.code_to_pub(sender_public_key), 
                 int.from_bytes(secret_pop_hash, 'big'), 
                 sender_secret_signature
             )
@@ -150,14 +150,14 @@ class Frost:
                 pass
         send = []
         for id in qualified:
-            encryption_joint_key = TSS.pub_to_code(
-                secret_key * TSS.code_to_pub(partners_public_keys[id]))
-            encryption_key = TSS.generate_hkdf_key(encryption_joint_key)
+            encryption_joint_key = Tss.pub_to_code(
+                secret_key * Tss.code_to_pub(partners_public_keys[id]))
+            encryption_key = Tss.generate_hkdf_key(encryption_joint_key)
             id_as_int = int(id)
             data = {
                 'receiver_id': id,
                 'sender_id': self.node_id,
-                'data': TSS.encrypt(
+                'data': Tss.encrypt(
                     {'receiver_id': id, 'f': fx.evaluate(id_as_int)},
                     encryption_key
                 )
@@ -182,23 +182,23 @@ class Frost:
             sender_id = message['sender_id']
             receiver_id = message['receiver_id']
             encrypted_data = message['data']
-            encryption_joint_key = TSS.pub_to_code(
-                secret_key * TSS.code_to_pub(partners_public_keys[sender_id]))
-            encryption_key = TSS.generate_hkdf_key(encryption_joint_key)
+            encryption_joint_key = Tss.pub_to_code(
+                secret_key * Tss.code_to_pub(partners_public_keys[sender_id]))
+            encryption_key = Tss.generate_hkdf_key(encryption_joint_key)
             
             assert receiver_id == self.node_id, 'ERROR: receiver_id does not match.'
-            data = json.loads(TSS.decrypt(encrypted_data, encryption_key))
+            data = json.loads(Tss.decrypt(encrypted_data, encryption_key))
             round2_data.append(data)
             for round1_data in round1_broadcasted_data:
                 if round1_data['sender_id'] == sender_id:
                     public_fx = round1_data['public_fx']
 
-                    point1 = TSS.calc_poly_point(
-                        list(map(TSS.code_to_pub, public_fx)),
+                    point1 = Tss.calc_poly_point(
+                        list(map(Tss.code_to_pub, public_fx)),
                         int(self.node_id)
                     )
                     
-                    point2 = data['f'] * TSS.ecurve.G
+                    point2 = data['f'] * Tss.ecurve.G
                
                     if point1 != point2:
                         complaints.append(
@@ -221,7 +221,7 @@ class Frost:
         public_fx = [dkg_saved_data['public_fx'][0]]
         for data in round1_broadcasted_data:
             if data['sender_id'] in self.partners:
-                public_fx.append(TSS.code_to_pub(data['public_fx'][0]))
+                public_fx.append(Tss.code_to_pub(data['public_fx'][0]))
 
         dkg_public_key = public_fx[0]
         for i in range(1, len(public_fx)):
@@ -232,16 +232,16 @@ class Frost:
 
         result = {
             'data': {
-                'dkg_public_key': TSS.pub_to_code(dkg_public_key),
-                'public_share' : TSS.pub_to_code(keys.get_public_key(share , TSS.ecurve)),
+                'dkg_public_key': Tss.pub_to_code(dkg_public_key),
+                'public_share' : Tss.pub_to_code(keys.get_public_key(share , Tss.ecurve)),
             },
             'status': 'SUCCESSFUL'
         }
         return result
 
     def complain(self, secret_key : int, partner_id : str, partner_public : Point) -> Dict:
-        encryption_joint_key = TSS.pub_to_code(secret_key * partner_public)
-        public_key = keys.get_public_key(secret_key , TSS.ecurve)
+        encryption_joint_key = Tss.pub_to_code(secret_key * partner_public)
+        public_key = keys.get_public_key(secret_key , Tss.ecurve)
         random_nonce, public_nonce = keys.gen_keypair()
         commitment  = random_nonce * partner_public
         complaint_pop_hash = Web3.solidity_keccak(
@@ -253,21 +253,21 @@ class Frost:
                 'uint8'
                 ],
             [
-                TSS.pub_to_code(public_key),
-                TSS.pub_to_code(partner_public),
+                Tss.pub_to_code(public_key),
+                Tss.pub_to_code(partner_public),
                 encryption_joint_key,
-                TSS.pub_to_code(public_nonce),
-                TSS.pub_to_code(commitment)
+                Tss.pub_to_code(public_nonce),
+                Tss.pub_to_code(commitment)
                 ],
         )
-        complaint_pop_sign = TSS.complaint_sign(
+        complaint_pop_sign = Tss.complaint_sign(
             secret_key, 
             random_nonce,  
             int.from_bytes(complaint_pop_hash, 'big')
         )
         complaint_pop = {
-            'public_nonce' : TSS.pub_to_code(public_nonce), 
-            'commitment' : TSS.pub_to_code(commitment), 
+            'public_nonce' : Tss.pub_to_code(public_nonce), 
+            'commitment' : Tss.pub_to_code(commitment), 
             'signature' : complaint_pop_sign
         }
 
@@ -290,14 +290,14 @@ class Frost:
             if nonce_d is None and nonce_e is None:
                 continue
 
-            signature = TSS.frost_single_sign(
+            signature = Tss.frost_single_sign(
                 int(self.node_id),
                 self.dkg_key_pair['share'],
                 nonce_d,
                 nonce_e,
                 message,
                 commitments_dict,
-                TSS.pub_to_code(self.dkg_key_pair['dkg_public_key'])
+                Tss.pub_to_code(self.dkg_key_pair['dkg_public_key'])
             )
             remove_data = {
                 'nonce_d_pair': {nonce['public_nonce_d']: nonce_d}, 
@@ -311,10 +311,10 @@ class Frost:
         nonce_publics = []
         save_data = []
         for _ in range(number_of_nonces):
-            nonce_d = TSS.generate_random_private()
-            nonce_e = TSS.generate_random_private()
-            public_nonce_d = TSS.pub_to_code(keys.get_public_key(nonce_d , TSS.ecurve))
-            public_nonce_e = TSS.pub_to_code(keys.get_public_key(nonce_e , TSS.ecurve))
+            nonce_d = Tss.generate_random_private()
+            nonce_e = Tss.generate_random_private()
+            public_nonce_d = Tss.pub_to_code(keys.get_public_key(nonce_d , Tss.ecurve))
+            public_nonce_e = Tss.pub_to_code(keys.get_public_key(nonce_e , Tss.ecurve))
 
             save_data.append({
                 'nonce_d_pair': {public_nonce_d: nonce_d},

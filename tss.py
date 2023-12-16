@@ -15,7 +15,7 @@ import json
 import base64
 
 
-class TSS:
+class Tss:
 
     ecurve: Curve = curve.secp256k1
     N: int = ecurve.q
@@ -60,11 +60,11 @@ class TSS:
     @staticmethod
     def code_to_pub(key: int) -> Point:
         key_byte = bytes.fromhex(hex(key).replace('x', ''))
-        return SEC1Encoder.decode_public_key(key_byte , TSS.ecurve)
+        return SEC1Encoder.decode_public_key(key_byte , Tss.ecurve)
 
     @staticmethod
     def private_to_point(private_key: int) -> Point:
-        return keys.get_public_key(private_key, TSS.ecurve)
+        return keys.get_public_key(private_key, Tss.ecurve)
 
     @staticmethod
     def pub_compress(public_key: Point) -> Dict:
@@ -78,7 +78,7 @@ class TSS:
         x = pub_dict['x']
         y = pub_dict['y_parity'] + 2
         coded = '0' + str(y) + x[2:]
-        publicKey = SEC1Encoder.decode_public_key(bytes.fromhex(coded) , TSS.ecurve)
+        publicKey = SEC1Encoder.decode_public_key(bytes.fromhex(coded) , Tss.ecurve)
         return publicKey
 
     @staticmethod
@@ -86,7 +86,7 @@ class TSS:
         x = int(x)
         coefs = []
         for i in range(len(polynomial)):
-            coefs.append(pow(x, i) % TSS.N)
+            coefs.append(pow(x, i) % Tss.N)
         result = coefs[0] * polynomial[0]
         for i in range(1, len(polynomial)):
             result = result + coefs[i] * polynomial[i]
@@ -94,7 +94,7 @@ class TSS:
 
     @staticmethod
     def generate_random_private() -> int:
-        return keys.gen_private_key(TSS.ecurve)
+        return keys.gen_private_key(Tss.ecurve)
 
     @staticmethod
     def langrange_coef(index: int, threshold: int, shares: List[Dict], x: int) -> int:
@@ -107,21 +107,21 @@ class TSS:
             denums.append(x_j - x_k)
         num = math.prod(nums)
         denum = math.prod(denums)
-        return TSS.mod_inverse(denum, TSS.N) * num
+        return Tss.mod_inverse(denum, Tss.N) * num
 
     @staticmethod
     def reconstruct_share(shares: List[Dict], threshold: int, x: int) -> int:
         assert len(shares) == threshold, 'Number of shares must be t.'
         sum = 0
         for j in range(threshold):
-            coef = TSS.langrange_coef(j, threshold, shares, x)
+            coef = Tss.langrange_coef(j, threshold, shares, x)
             key = shares[j]['key']
-            sum = (sum + (key * coef % TSS.N)) % TSS.N
-        return sum % TSS.N
+            sum = (sum + (key * coef % Tss.N)) % Tss.N
+        return sum % Tss.N
 
     @staticmethod
     def schnorr_hash(public_key: Point, message: int) -> str:
-        address = TSS.pub_to_addr(public_key)
+        address = Tss.pub_to_addr(public_key)
         addressBuff = str(address)[2:]
         msgBuff = str(hex(message))[2:]
         totalBuff = addressBuff + msgBuff
@@ -129,8 +129,8 @@ class TSS:
 
     @staticmethod
     def schnorr_sign(shared_private_key: int, nounce_private: int, nounce_public: Point, message: int) -> Dict[str, int]:
-        e = int.from_bytes(TSS.schnorr_hash(nounce_public, message), 'big')
-        s = (nounce_private - e * shared_private_key) % TSS.N
+        e = int.from_bytes(Tss.schnorr_hash(nounce_public, message), 'big')
+        s = (nounce_private - e * shared_private_key) % Tss.N
         return {'s': s, 'e': e}
 
     @staticmethod
@@ -150,12 +150,12 @@ class TSS:
     @staticmethod
     def schnorr_verify(public_key: Point, message: str, signature: str) -> bool:
         if type(signature) == str:
-            signature = TSS.split_signature(signature)
+            signature = Tss.split_signature(signature)
         if type(message) != int:
             message = int(message)
-        assert signature['s'] < TSS.N, 'Signature must be reduced modulo N'
-        r_v = (signature['s']* TSS.ecurve.G) + (signature['e'] * public_key)
-        e_v = TSS.schnorr_hash(r_v, message)
+        assert signature['s'] < Tss.N, 'Signature must be reduced modulo N'
+        r_v = (signature['s']* Tss.ecurve.G) + (signature['e'] * public_key)
+        e_v = Tss.schnorr_hash(r_v, message)
         return int.from_bytes(e_v, 'big') == signature['e']
 
     @staticmethod
@@ -164,10 +164,10 @@ class TSS:
         aggregated_signature = 0
 
         for j in range(threshold):
-            coef = TSS.langrange_coef(
+            coef = Tss.langrange_coef(
                 j, threshold, [{'id': i} for i in party], 0)
             aggregated_signature += signatures[j]['s'] * coef
-        s = aggregated_signature % TSS.N
+        s = aggregated_signature % Tss.N
         e = signatures[0]['e']
         return {'s': s, 'e': e}
 
@@ -187,12 +187,12 @@ class TSS:
         message_hash = Web3.keccak(text=message)
 
         for commitment in commitments_list:
-            nonce_d_public = TSS.code_to_pub(commitment['public_nonce_d'])
-            nonce_e_public = TSS.code_to_pub(commitment['public_nonce_e'])
-            assert TSS.ecurve.is_point_on_curve(
+            nonce_d_public = Tss.code_to_pub(commitment['public_nonce_d'])
+            nonce_e_public = Tss.code_to_pub(commitment['public_nonce_e'])
+            assert Tss.ecurve.is_point_on_curve(
                 (nonce_d_public.x, nonce_d_public.y)
                 ), f'Nonce D from Node {commitment["id"]} Not on Curve'
-            assert TSS.ecurve.is_point_on_curve(
+            assert Tss.ecurve.is_point_on_curve(
                 (nonce_e_public.x, nonce_e_public.y)
                 ), f'Nonce E from Node {commitment["id"]} Not on Curve'
 
@@ -222,21 +222,21 @@ class TSS:
                 'address'
             ],
             [
-                Web3.to_int(hexstr= TSS.pub_compress(TSS.code_to_pub(group_key))['x']),
-                TSS.pub_compress(TSS.code_to_pub(group_key))['y_parity'],
+                Web3.to_int(hexstr= Tss.pub_compress(Tss.code_to_pub(group_key))['x']),
+                Tss.pub_compress(Tss.code_to_pub(group_key))['y_parity'],
                 Web3.to_int(message_hash),
-                TSS.pub_to_addr(aggregated_public_nonce)
+                Tss.pub_to_addr(aggregated_public_nonce)
             ]
         )
 
-        coef = TSS.langrange_coef(index, len(party), commitments_list, 0)
+        coef = Tss.langrange_coef(index, len(party), commitments_list, 0)
         signature_share = (nonce_d + nonce_e * int.from_bytes(my_row, 'big') -
-                           coef * share * int.from_bytes(challenge, 'big')) % TSS.N
+                           coef * share * int.from_bytes(challenge, 'big')) % Tss.N
         return {
             'id': id, 
             'signature': signature_share, 
-            'public_key': TSS.pub_to_code(keys.get_public_key(share , TSS.ecurve)),
-            'aggregated_public_nonce': TSS.pub_to_code(aggregated_public_nonce)
+            'public_key': Tss.pub_to_code(keys.get_public_key(share , Tss.ecurve)),
+            'aggregated_public_nonce': Tss.pub_to_code(aggregated_public_nonce)
             }
 
     @staticmethod
@@ -251,8 +251,8 @@ class TSS:
 
         for commitment in commitments_list:
             if commitment['id'] == id:
-                nonce_d_public = TSS.code_to_pub(commitment['public_nonce_d'])
-                nonce_e_public = TSS.code_to_pub(commitment['public_nonce_e'])
+                nonce_d_public = Tss.code_to_pub(commitment['public_nonce_d'])
+                nonce_e_public = Tss.code_to_pub(commitment['public_nonce_e'])
                 row = Web3.solidity_keccak(
                     ['string', 'bytes', 'bytes'],
                     [hex(commitment['id']),  message_hash,  commitments_hash]
@@ -268,17 +268,17 @@ class TSS:
                 'address'
             ],
             [
-                Web3.to_int(hexstr=TSS.pub_compress(TSS.code_to_pub(group_key))['x']),
-                TSS.pub_compress(TSS.code_to_pub(group_key))['y_parity'],
+                Web3.to_int(hexstr=Tss.pub_compress(Tss.code_to_pub(group_key))['x']),
+                Tss.pub_compress(Tss.code_to_pub(group_key))['y_parity'],
                 Web3.to_int(message_hash),
-                TSS.pub_to_addr(aggregated_public_nonce)
+                Tss.pub_to_addr(aggregated_public_nonce)
             ]
         )
 
-        coef = TSS.langrange_coef(index, len(commitments_list), commitments_list, 0)
+        coef = Tss.langrange_coef(index, len(commitments_list), commitments_list, 0)
 
-        point1 = public_nonce - (int.from_bytes(challenge, 'big')* coef * TSS.code_to_pub(public_key_share))
-        point2 = single_signature['signature'] * TSS.ecurve.G
+        point1 = public_nonce - (int.from_bytes(challenge, 'big')* coef * Tss.code_to_pub(public_key_share))
+        point2 = single_signature['signature'] * Tss.ecurve.G
 
         return point1 == point2
 
@@ -291,8 +291,8 @@ class TSS:
         message_hash = Web3.keccak(text=message)
 
         for commitment in commitments_list:
-            nonce_d_public = TSS.code_to_pub(commitment['public_nonce_d'])
-            nonce_e_public = TSS.code_to_pub(commitment['public_nonce_e'])
+            nonce_d_public = Tss.code_to_pub(commitment['public_nonce_d'])
+            nonce_e_public = Tss.code_to_pub(commitment['public_nonce_e'])
 
             row = Web3.solidity_keccak(
                 ['string', 'bytes', 'bytes'],
@@ -313,8 +313,8 @@ class TSS:
         aggregated_signature = 0
         for sign in single_signatures:
             aggregated_signature = aggregated_signature + sign['signature']
-        aggregated_signature = aggregated_signature % TSS.N
-        return {'nonce': TSS.pub_to_addr(aggregated_public_nonce), 'public_key': TSS.pub_compress(TSS.code_to_pub(group_key)),
+        aggregated_signature = aggregated_signature % Tss.N
+        return {'nonce': Tss.pub_to_addr(aggregated_public_nonce), 'public_key': Tss.pub_compress(Tss.code_to_pub(group_key)),
                 'signature': aggregated_signature, 'message_hash': message_hash}
 
     @staticmethod
@@ -335,12 +335,12 @@ class TSS:
             ]
         )
 
-        point = (aggregated_signature['signature'] * TSS.ecurve.G) + (
-            int.from_bytes(challenge, 'big') * TSS.pub_decompress(aggregated_signature['public_key']))
-        return aggregated_signature['nonce'] == TSS.pub_to_addr(point)
+        point = (aggregated_signature['signature'] * Tss.ecurve.G) + (
+            int.from_bytes(challenge, 'big') * Tss.pub_decompress(aggregated_signature['public_key']))
+        return aggregated_signature['nonce'] == Tss.pub_to_addr(point)
     @staticmethod
     def complaint_sign(private_key : int , nonce : int , hash : int):
-        return (nonce + private_key * hash) % TSS.N 
+        return (nonce + private_key * hash) % Tss.N 
     
     @staticmethod
     def complaint_verify(public_complaintant : Point, public_malicious : Point , encryption_key : Point , proof , hash : int):
@@ -349,7 +349,7 @@ class TSS:
         signature = proof['signature']
         
         point1 = public_nonce + (hash * public_complaintant)
-        point2 = signature * TSS.ecurve.G
+        point2 = signature * Tss.ecurve.G
         verification1 = (point1 == point2)
         
         point1 = public_commitment + (hash * encryption_key)
