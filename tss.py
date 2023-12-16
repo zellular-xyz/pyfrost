@@ -21,9 +21,6 @@ class TSS:
     N: int = ecurve.q
     Half_N: int = ((N >> 1) % N + 1) % N
 
-    def __init__(self) -> None:
-        return
-
     @staticmethod
     def mod_inverse(number: int, modulus: int) -> int:
         original_modulus = modulus
@@ -145,7 +142,7 @@ class TSS:
     @staticmethod
     def split_signature(string_signature: str) -> Dict[str, int]:
         raw_bytes = string_signature[2:]
-        assert len(raw_bytes) == 128, "Invalid schnorr signature string"
+        assert len(raw_bytes) == 128, 'Invalid schnorr signature string'
         e = '0x' + raw_bytes[0:64]
         s = '0x' + raw_bytes[64:]
         return {'s': int(s, 16), 'e': int(e, 16)}
@@ -194,10 +191,10 @@ class TSS:
             nonce_e_public = TSS.code_to_pub(commitment['public_nonce_e'])
             assert TSS.ecurve.is_point_on_curve(
                 (nonce_d_public.x, nonce_d_public.y)
-                ), f"Nonce D from Node {commitment['id']} Not on Curve"
+                ), f'Nonce D from Node {commitment["id"]} Not on Curve'
             assert TSS.ecurve.is_point_on_curve(
                 (nonce_e_public.x, nonce_e_public.y)
-                ), f"Nonce E from Node {commitment['id']} Not on Curve"
+                ), f'Nonce E from Node {commitment["id"]} Not on Curve'
 
             party.append(commitment['id'])
 
@@ -365,7 +362,7 @@ class TSS:
     @staticmethod
     def generate_hkdf_key(key: int) -> bytes:
         hkdf = HKDF(algorithm=hashes.SHA256(), length=32,
-                    salt=b"", info=b"", backend=default_backend())
+                    salt=b'', info=b'', backend=default_backend())
         return hkdf.derive(bytes.fromhex(str(key)))
 
     @staticmethod
@@ -374,11 +371,11 @@ class TSS:
             data = json.dumps(data)
         key = base64.b64encode(key)
         fernet = Fernet(key)
-        return fernet.encrypt(data.encode()).decode(encoding="utf-8")
+        return fernet.encrypt(data.encode()).decode(encoding='utf-8')
 
     @staticmethod
     def decrypt(data: str, key: bytes) -> str:
-        data = bytes(data, encoding="utf-8")
+        data = bytes(data, encoding='utf-8')
         key = base64.b64encode(key)
         fernet = Fernet(key)
         return fernet.decrypt(data).decode()
