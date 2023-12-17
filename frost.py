@@ -1,8 +1,8 @@
 import logging
 from fastecdsa import keys
-from tss import Tss, Point
-from polynomial import Polynomial
 from web3 import Web3
+from .polynomial import Polynomial
+from .tss import Tss, Point
 from typing import List, Dict
 
 import json
