@@ -3,7 +3,8 @@ from typing import List
 import random
 import __init__
 import unittest
-
+from utils import Utils 
+from utils import keys as crypto
 ############## initial parameters  
 dkg_id = str(random.randint(0 , 100))
 n = 5
@@ -53,16 +54,26 @@ commitments_data = {}
 for key in sign_subset:
     commitment = saved_data['common_data'][key.node_id].pop()
     commitments_data[key.node_id] = commitment
-
+signs = []
 agregated_nonces = []
 for key in sign_subset:
     single_sign , remove_data = key.sign(commitments_data , msg , saved_data['private_data'][key.node_id]['nonces'])
+    if __init__.verify_single_signature(int(key.node_id) , msg , commitments_data , Utils.code_to_pub(single_sign['aggregated_public_nonce']) , Utils.pub_to_code(crypto.get_public_key(key.dkg_key_pair['share'],Utils.ecurve)) , single_sign ,Utils.pub_to_code(key.dkg_key_pair['dkg_public_key'] )):
+        signs.append(single_sign)
+    else:
+        print('Failed at verify single signatue')
+        exit()
     saved_data['private_data'][key.node_id]['nonces'].remove(remove_data)  
     agregated_nonces.append(single_sign['aggregated_public_nonce'])
 if len(set(agregated_nonces)) == 1:
-    print('True')
+    print('Test1 Passed')
 else:
-    print('False')
+    print('Failed at verify nonces')
+group_sign = __init__.aggregate_signatures(msg ,signs,Utils.code_to_pub(agregated_nonces[0]),result['data']['dkg_public_key'])
+if __init__.verify_group_signature(group_sign):
+    print('Test2 passed')
+else:
+    print('Failed at verify group signatue')
 # class TestCase(unittest.TestCase):
     
 #     def test_function_name(self):
