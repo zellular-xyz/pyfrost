@@ -266,5 +266,3 @@ class DistributedKey:
             }
             
         return signature, remove_data
-    
-    

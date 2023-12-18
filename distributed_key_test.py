@@ -1,4 +1,4 @@
-from key import DistributedKey
+from distributed_key import DistributedKey
 from typing import List
 import random
 import __init__
