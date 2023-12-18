@@ -2,7 +2,7 @@ from polynomial import Polynomial
 from fastecdsa import keys
 from web3 import Web3
 from utils import Utils
-
+import __init__
 import random
 import json
 
@@ -162,19 +162,19 @@ for _ in range(5):
             if nonce['id'] == id:
                 nonce_d = nonce['public_nonce_d']
                 nonce_e = nonce['public_nonce_e']
-        single_signature = Utils.frost_single_sign(
+        single_signature = __init__.single_sign(
             id, share, nonce_d, nonce_e, message, commitments_dict, group_key)
         share_public_keys[id] = Utils.pub_to_code(keys.get_public_key(share , Utils.ecurve))
         signatures.append(single_signature)
-    group_nonce = Utils.frost_aggregate_nonce(message , commitments_dict , group_key)
+    group_nonce = __init__.aggregate_nonce(message , commitments_dict , group_key)
     verification = True
     for single_signature in signatures:
-        if not Utils.frost_verify_single_signature(single_signature['id'] , message , commitments_dict , group_nonce , share_public_keys[single_signature['id']] , single_signature , group_key):
+        if not __init__.verify_single_signature(single_signature['id'] , message , commitments_dict , group_nonce , share_public_keys[single_signature['id']] , single_signature , group_key):
             verification = False
             break
     if verification:
-        group_sign = Utils.frost_aggregate_signatures(message, signatures , group_nonce , group_key)
-        group_verification = Utils.frost_verify_group_signature(group_sign)
+        group_sign = __init__.aggregate_signatures(message, signatures , group_nonce , group_key)
+        group_verification = __init__.verify_group_signature(group_sign)
     else:
         group_verification = False
     print(f"Selected Nodes : {nodes_subset} , verified : {verification}")

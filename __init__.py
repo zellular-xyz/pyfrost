@@ -5,6 +5,7 @@ from utils import Utils
 from web3 import Web3
 import json
 
+
 def single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,
                         commitments_dict: Dict[str,Dict[str ,int]], group_key: Point) -> Dict[str, int]:
 
