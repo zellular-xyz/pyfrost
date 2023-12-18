@@ -1,4 +1,4 @@
-from frost import FROST
+from key import DistributedKey
 from typing import List
 import random
 import unittest
@@ -10,11 +10,11 @@ t = 3
 party = [str(random.randint(0 , 100)) for i in range(n)]
 coef0 = 1
 
-frost_nodes : List[FROST] = []
+frost_nodes : List[DistributedKey] = []
 for node_id in party:
     partners = party.copy()
     partners.remove(node_id)
-    frost_nodes.append(FROST(dkg_id , t , n , node_id , partners , coef0))
+    frost_nodes.append(DistributedKey(dkg_id , t , n , node_id , partners , coef0))
 
 saved_data = {}
 # assert round1_send_data['public_fx'][0] == 286650441496909734516720688912544350032790572785058722254415355376215376009112 , 'error'
@@ -42,7 +42,7 @@ for frost_node in frost_nodes:
 saved_data['common_data'] = {}
 saved_data['private_data'] = {}
 for frost_node in frost_nodes:
-    nonces_common_data , nonces_private_data = FROST.nonce_preprocess(int(frost_node.node_id))
+    nonces_common_data , nonces_private_data = DistributedKey.nonce_preprocess(int(frost_node.node_id))
     saved_data['common_data'].update({frost_node.node_id : nonces_common_data})
     saved_data['private_data'].update({frost_node.node_id : {'nonces' : nonces_private_data}})
 
