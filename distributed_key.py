@@ -1,10 +1,10 @@
 import logging
 from fastecdsa import keys
 from web3 import Web3
-from polynomial import Polynomial
-from utils import Utils, Point
+from .polynomial import Polynomial
+from .utils import Utils, Point
 from typing import List, Dict
-import __init__
+from .__init__ import single_sign
 import json
 
 
@@ -251,7 +251,7 @@ class DistributedKey:
             if nonce_d is None and nonce_e is None:
                 continue
 
-            signature = __init__.single_sign(
+            signature = single_sign(
                 int(self.node_id),
                 self.dkg_key_pair['share'],
                 nonce_d,

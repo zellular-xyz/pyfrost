@@ -2,7 +2,7 @@ from polynomial import Polynomial
 from fastecdsa import keys
 from web3 import Web3
 from utils import Utils
-import __init__
+from . import __init__
 import random
 import json
 

@@ -1,7 +1,7 @@
 from typing import Dict , List
 from fastecdsa.point import Point
 from fastecdsa import keys
-from utils import Utils
+from .utils import Utils
 from web3 import Web3
 import json
 
