@@ -1,6 +1,6 @@
 import json
 from libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
-import .pyfrost
+import frost
 from .abstract import NodeInfo
 
 from libp2p.host.host_interface import IHost
@@ -12,6 +12,7 @@ import types
 import pprint
 import trio
 import logging
+import uuid
 
 
 class SA(Libp2pBase):

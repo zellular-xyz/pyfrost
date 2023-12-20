@@ -30,6 +30,7 @@ PROTOCOLS_ID = {
     'sign': TProtocol('/muon/1.0.0/sign'),
 }
 
+
 class RequestObject:
     def __init__(self, request_id: str, call_method: str, parameters: Dict,
                  input_data: Dict = None) -> None:
@@ -47,6 +48,7 @@ class RequestObject:
         if self.input_data:
             result['input_data'] = self.input_data
         return result
+
 
 class Libp2pBase:
 
