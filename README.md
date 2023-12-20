@@ -71,8 +71,20 @@ There are three functions for Distributed Key Generation (DKG) and one for resol
 
 To issue FROST signature, we have 2 key functions:
 
-1. generate_nonces(params):
-2. frost_sign(params):
+1. `Frost.nonce_preprocess(node_id: int, number_of_nonces=10) -> List[List]`:
+   This function is `staticmethod` that generate a batch of public-private keys as nonce. This nonces, then use when a client (i.e. signature aggregator (SA)) request signature.
+
+     **Inputs:**
+   - `node_id`: The id of the current node.
+   - `number_of_nonces`: The number of nunces to be generated.
+
+   **Outputs:** A list of `[nonce_publics, save_data]`
+   - `nonce_publics`: The public nonces to be send to whome request nonces.
+   - `save_data`: Data to be saved in memory or a database. This data consist of public and private of nonces.
+
+2. `Frost.sign(self, commitments_dict, message: str , nonces : Dict) -> List`:
+   This function 
+
 3. frost_aggregate_signatures(params)
 
 ### Verifing Signature
