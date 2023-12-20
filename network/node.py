@@ -1,5 +1,4 @@
 from .libp2p_base import Libp2pBase, PROTOCOLS_ID
-import frost
 from abstract import NodeInfo, DataManager
 
 from libp2p.network.stream.net_stream_interface import INetStream

@@ -1,6 +1,6 @@
 import json
 from libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
-import frost
+import pyfrost
 from .abstract import NodeInfo
 
 from libp2p.host.host_interface import IHost

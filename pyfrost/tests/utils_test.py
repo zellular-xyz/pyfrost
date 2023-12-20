@@ -1,7 +1,7 @@
 from polynomial import Polynomial
 from fastecdsa import keys
 from web3 import Web3
-from utils import Utils
+from pyfrost.crypto_utils import Utils
 import __init__
 import random
 import json

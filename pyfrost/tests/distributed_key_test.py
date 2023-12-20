@@ -3,8 +3,8 @@ from typing import List
 import random
 import __init__
 import unittest
-from utils import Utils
-from utils import keys as crypto
+from pyfrost.crypto_utils import Utils
+from pyfrost.crypto_utils import keys as crypto
 # initial parameters
 dkg_id = str(random.randint(0, 100))
 n = 5
