@@ -6,7 +6,7 @@ import json
 from fastecdsa.point import Point
 
 
-class DKG:
+class KeyGen:
     def __init__(self, dkg_id: str, threshold: int, n: int, node_id: str, partners: List[str], coefficient0: str = None) -> None:
         self.threshold: int = threshold
         self.n: int = n
@@ -276,7 +276,7 @@ class Key:
         return signature, remove_data
 
 
-def creat_nonces(node_id: int, number_of_nonces=10) -> List[List]:
+def create_nonces(node_id: int, number_of_nonces=10) -> List[List]:
     nonce_publics = []
     private_data = []
     for _ in range(number_of_nonces):
@@ -483,7 +483,7 @@ def __single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,
     }
 
 
-def __create_complain(node_id: str, secret_key: int, partner_id: str, partner_public: Point) -> Dict:
+def __create_complaint(node_id: str, secret_key: int, partner_id: str, partner_public: Point) -> Dict:
     encryption_joint_key = __utils.pub_to_code(secret_key * partner_public)
     public_key = keys.get_public_key(secret_key, __utils.ecurve)
     random_nonce, public_nonce = keys.gen_keypair()
