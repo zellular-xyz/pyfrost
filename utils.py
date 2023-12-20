@@ -4,7 +4,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.fernet import Fernet
 
 from fastecdsa.encoding.sec1 import SEC1Encoder
-from fastecdsa import keys , curve
+from fastecdsa import keys, curve
 from fastecdsa.curve import Curve
 from fastecdsa.point import Point
 from typing import List, Dict
@@ -54,13 +54,13 @@ class Utils:
 
     @staticmethod
     def pub_to_code(public_key: Point) -> int:
-        comp_pub = SEC1Encoder.encode_public_key(public_key , True)
+        comp_pub = SEC1Encoder.encode_public_key(public_key, True)
         return int(comp_pub.hex(), 16)
 
     @staticmethod
     def code_to_pub(key: int) -> Point:
         key_byte = bytes.fromhex(hex(key).replace('x', ''))
-        return SEC1Encoder.decode_public_key(key_byte , Utils.ecurve)
+        return SEC1Encoder.decode_public_key(key_byte, Utils.ecurve)
 
     @staticmethod
     def private_to_point(private_key: int) -> Point:
@@ -68,9 +68,9 @@ class Utils:
 
     @staticmethod
     def pub_compress(public_key: Point) -> Dict:
-        coded = SEC1Encoder.encode_public_key(public_key , True)
+        coded = SEC1Encoder.encode_public_key(public_key, True)
         x = '0x' + coded.hex()[2:]
-        y = int(coded.hex()[1]) - 2 
+        y = int(coded.hex()[1]) - 2
         return {'x': x, 'y_parity': y}
 
     @staticmethod
@@ -78,7 +78,8 @@ class Utils:
         x = pub_dict['x']
         y = pub_dict['y_parity'] + 2
         coded = '0' + str(y) + x[2:]
-        publicKey = SEC1Encoder.decode_public_key(bytes.fromhex(coded) , Utils.ecurve)
+        publicKey = SEC1Encoder.decode_public_key(
+            bytes.fromhex(coded), Utils.ecurve)
         return publicKey
 
     @staticmethod
@@ -154,7 +155,7 @@ class Utils:
         if type(message) != int:
             message = int(message)
         assert signature['s'] < Utils.N, 'Signature must be reduced modulo N'
-        r_v = (signature['s']* Utils.ecurve.G) + (signature['e'] * public_key)
+        r_v = (signature['s'] * Utils.ecurve.G) + (signature['e'] * public_key)
         e_v = Utils.schnorr_hash(r_v, message)
         return int.from_bytes(e_v, 'big') == signature['e']
 
@@ -171,27 +172,25 @@ class Utils:
         e = signatures[0]['e']
         return {'s': s, 'e': e}
 
-    
     @staticmethod
-    def complaint_sign(private_key : int , nonce : int , hash : int):
-        return (nonce + private_key * hash) % Utils.N 
-    
+    def complaint_sign(private_key: int, nonce: int, hash: int):
+        return (nonce + private_key * hash) % Utils.N
+
     @staticmethod
-    def complaint_verify(public_complaintant : Point, public_malicious : Point , encryption_key : Point , proof , hash : int):
+    def complaint_verify(public_complaintant: Point, public_malicious: Point, encryption_key: Point, proof, hash: int):
         public_nonce = proof['public_nonce']
         public_commitment = proof['commitment']
         signature = proof['signature']
-        
+
         point1 = public_nonce + (hash * public_complaintant)
         point2 = signature * Utils.ecurve.G
         verification1 = (point1 == point2)
-        
+
         point1 = public_commitment + (hash * encryption_key)
         point2 = signature * public_malicious
         verification2 = (point1 == point2)
-        
+
         return verification1 and verification2
-    
 
     @staticmethod
     def generate_hkdf_key(key: int) -> bytes:

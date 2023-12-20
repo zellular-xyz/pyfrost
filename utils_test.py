@@ -145,7 +145,8 @@ for _ in range(5):
     for id in nodes_subset:
         nonce_d, public_nonce_d = keys.gen_keypair(Utils.ecurve)
         nonce_e, public_nonce_e = keys.gen_keypair(Utils.ecurve)
-        private_nonces.append({'id': int(id), 'public_nonce_d': nonce_d, 'public_nonce_e': nonce_e})
+        private_nonces.append(
+            {'id': int(id), 'public_nonce_d': nonce_d, 'public_nonce_e': nonce_e})
         commitments_dict[id] = {
             'id': int(id),
             'public_nonce_d': Utils.pub_to_code(public_nonce_d),
@@ -164,16 +165,19 @@ for _ in range(5):
                 nonce_e = nonce['public_nonce_e']
         single_signature = __init__.single_sign(
             id, share, nonce_d, nonce_e, message, commitments_dict, group_key)
-        share_public_keys[id] = Utils.pub_to_code(keys.get_public_key(share , Utils.ecurve))
+        share_public_keys[id] = Utils.pub_to_code(
+            keys.get_public_key(share, Utils.ecurve))
         signatures.append(single_signature)
-    group_nonce = __init__.aggregate_nonce(message , commitments_dict , group_key)
+    group_nonce = __init__.aggregate_nonce(
+        message, commitments_dict, group_key)
     verification = True
     for single_signature in signatures:
-        if not __init__.verify_single_signature(single_signature['id'] , message , commitments_dict , group_nonce , share_public_keys[single_signature['id']] , single_signature , group_key):
+        if not __init__.verify_single_signature(single_signature['id'], message, commitments_dict, group_nonce, share_public_keys[single_signature['id']], single_signature, group_key):
             verification = False
             break
     if verification:
-        group_sign = __init__.aggregate_signatures(message, signatures , group_nonce , group_key)
+        group_sign = __init__.aggregate_signatures(
+            message, signatures, group_nonce, group_key)
         group_verification = __init__.verify_group_signature(group_sign)
     else:
         group_verification = False

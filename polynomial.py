@@ -3,6 +3,7 @@ from fastecdsa.point import Point
 from fastecdsa.curve import Curve
 from typing import List
 
+
 class Polynomial:
     """
     A class representing a polynomial for use in cryptographic schemes such as
@@ -21,7 +22,7 @@ class Polynomial:
         coef_pub_keys(): Returns the public keys corresponding to the private
                          coefficient keys.
     """
-    
+
     def __init__(self, threshold: int, curve: Curve, coefficient0: str = None) -> None:
         """
         Initializes the Polynomial instance.
@@ -37,7 +38,7 @@ class Polynomial:
         self.threshold: int = threshold
         self.curve: Curve = curve
         self.coefficients: List[int] = []
-        
+
         # If an initial coefficient is provided, convert it to an integer from a hex string if necessary
         # and add it as the first coefficient of the polynomial.
         if coefficient0 is not None:
@@ -65,7 +66,7 @@ class Polynomial:
         # Convert x to an integer if it is provided as a string.
         if type(x) == str:
             x = int(x)
-        
+
         # Evaluate the polynomial using Horner's method for efficiency.
         for i in range(len(self.coefficients)):
             result += self.coefficients[i] * pow(x, i)
@@ -84,5 +85,5 @@ class Polynomial:
         result = []
         for coefficient in self.coefficients:
             # Convert each private key coefficient to its corresponding public key.
-            result.append(keys.get_public_key(coefficient , self.curve))
+            result.append(keys.get_public_key(coefficient, self.curve))
         return result

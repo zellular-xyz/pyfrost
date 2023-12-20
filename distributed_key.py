@@ -18,10 +18,10 @@ class DistributedKey:
         self.coefficient0 = coefficient0
         self.malicious: List = []
         self.status = 'STARTED'
-    
+
     def round1(self) -> List[Dict]:
-        secret_key, public_key =  keys.gen_keypair(Utils.ecurve)
-        secret_nonce, public_nonce =  keys.gen_keypair(Utils.ecurve)
+        secret_key, public_key = keys.gen_keypair(Utils.ecurve)
+        secret_nonce, public_nonce = keys.gen_keypair(Utils.ecurve)
         secret_pop_hash = Web3.solidity_keccak(
             [
                 'string',
@@ -50,24 +50,25 @@ class DistributedKey:
         # Generate DKG polynomial
         fx = Polynomial(self.threshold, Utils.ecurve, self.coefficient0)
         public_fx = fx.coef_pub_keys()
-        
+
         coef0_nonce, public_coef0_nonce = keys.gen_keypair(Utils.ecurve)
         coef0_pop_hash = Web3.solidity_keccak(
             [
-                'string', 
-                'string', 
-                'uint8', 
+                'string',
+                'string',
+                'uint8',
                 'uint8'
-                ],
+            ],
             [
-                self.node_id, 
-                self.dkg_id, 
-                Utils.pub_to_code(public_fx[0]), 
+                self.node_id,
+                self.dkg_id,
+                Utils.pub_to_code(public_fx[0]),
                 Utils.pub_to_code(public_coef0_nonce)
-                ],
+            ],
         )
         coef0_pop_sign = Utils.schnorr_sign(
-            fx.coefficients[0], coef0_nonce, public_coef0_nonce, int.from_bytes(coef0_pop_hash, 'big')
+            fx.coefficients[0], coef0_nonce, public_coef0_nonce, int.from_bytes(
+                coef0_pop_hash, 'big')
         )
 
         coef0_signature = {
@@ -84,19 +85,19 @@ class DistributedKey:
         }
 
         save_data = {
-            'dkg_id' : self.dkg_id,
-            'data' : {
-                'secret_key' : secret_key,
-                'fx' : fx,
-                'public_fx' : public_fx,
-                'coef0_signature' : coef0_signature
+            'dkg_id': self.dkg_id,
+            'data': {
+                'secret_key': secret_key,
+                'fx': fx,
+                'public_fx': public_fx,
+                'coef0_signature': coef0_signature
             }
         }
-        
-        return broadcast , save_data
 
-    def round2(self, round1_broadcasted_data , dkg_saved_data) -> List[Dict]:
-        
+        return broadcast, save_data
+
+    def round2(self, round1_broadcasted_data, dkg_saved_data) -> List[Dict]:
+
         fx: Polynomial = dkg_saved_data['fx']
         partners_public_keys = {}
         secret_key = dkg_saved_data['secret_key']
@@ -116,11 +117,11 @@ class DistributedKey:
             )
 
             coef0_verification = Utils.schnorr_verify(
-                Utils.code_to_pub(sender_public_fx[0]), 
-                int.from_bytes(coef0_pop_hash, 'big'), 
+                Utils.code_to_pub(sender_public_fx[0]),
+                int.from_bytes(coef0_pop_hash, 'big'),
                 sender_coef0_signature
             )
-        
+
             sender_public_key = data['public_key']
             sender_secret_nonce = data['secret_signature']['nonce']
             sender_secret_signature = data['secret_signature']['signature']
@@ -131,8 +132,8 @@ class DistributedKey:
             )
 
             secret_verification = Utils.schnorr_verify(
-                Utils.code_to_pub(sender_public_key), 
-                int.from_bytes(secret_pop_hash, 'big'), 
+                Utils.code_to_pub(sender_public_key),
+                int.from_bytes(secret_pop_hash, 'big'),
                 sender_secret_signature
             )
 
@@ -141,7 +142,7 @@ class DistributedKey:
                 # TODO: how to handle complaint
                 self.malicious.append({'id': sender_id, 'complaint': data})
             partners_public_keys[sender_id] = sender_public_key
-          
+
         qualified = self.partners
         for node in self.malicious:
             try:
@@ -163,17 +164,17 @@ class DistributedKey:
                 )
             }
             send.append(data)
-        
+
         save_data = {
-            'dkg_id' : self.dkg_id,
-            'data' : {
-                'partners_public_keys' : partners_public_keys
+            'dkg_id': self.dkg_id,
+            'data': {
+                'partners_public_keys': partners_public_keys
             }
         }
-        
-        return send , save_data
 
-    def round3(self, round1_broadcasted_data, round2_encrypted_data , dkg_saved_data) -> Dict:
+        return send, save_data
+
+    def round3(self, round1_broadcasted_data, round2_encrypted_data, dkg_saved_data) -> Dict:
         secret_key = dkg_saved_data['secret_key']
         partners_public_keys = dkg_saved_data['partners_public_keys']
         round2_data = []
@@ -185,7 +186,7 @@ class DistributedKey:
             encryption_joint_key = Utils.pub_to_code(
                 secret_key * Utils.code_to_pub(partners_public_keys[sender_id]))
             encryption_key = Utils.generate_hkdf_key(encryption_joint_key)
-            
+
             assert receiver_id == self.node_id, 'ERROR: receiver_id does not match.'
             data = json.loads(Utils.decrypt(encrypted_data, encryption_key))
             round2_data.append(data)
@@ -197,21 +198,21 @@ class DistributedKey:
                         list(map(Utils.code_to_pub, public_fx)),
                         int(self.node_id)
                     )
-                    
+
                     point2 = data['f'] * Utils.ecurve.G
-               
+
                     if point1 != point2:
                         complaints.append(
                             self.complain(
-                                secret_key, 
-                                sender_id, 
+                                secret_key,
+                                sender_id,
                                 partners_public_keys[sender_id]
-                                )
                             )
-                        
+                        )
+
         if len(complaints) > 0:
-            return {'status' : 'COMPLAINT' , 'data' : complaints}
-                
+            return {'status': 'COMPLAINT', 'data': complaints}
+
         fx: Polynomial = dkg_saved_data['fx']
         my_fragment = fx.evaluate(int(self.node_id))
         share_fragments = [my_fragment]
@@ -233,13 +234,13 @@ class DistributedKey:
         result = {
             'data': {
                 'dkg_public_key': Utils.pub_to_code(dkg_public_key),
-                'public_share' : Utils.pub_to_code(keys.get_public_key(share , Utils.ecurve)),
+                'public_share': Utils.pub_to_code(keys.get_public_key(share, Utils.ecurve)),
             },
             'status': 'SUCCESSFUL'
         }
         return result
 
-    def sign(self, commitments_dict, message: str, nonces : Dict) -> List:
+    def sign(self, commitments_dict, message: str, nonces: Dict) -> List:
         assert type(message) == str, 'Message should be from string type.'
         nonce_d = 0
         nonce_e = 0
@@ -261,8 +262,8 @@ class DistributedKey:
                 Utils.pub_to_code(self.dkg_key_pair['dkg_public_key'])
             )
             remove_data = {
-                'nonce_d_pair': {nonce['public_nonce_d']: nonce_d}, 
+                'nonce_d_pair': {nonce['public_nonce_d']: nonce_d},
                 'nonce_e_pair': {nonce['public_nonce_e']: nonce_e}
             }
-            
+
         return signature, remove_data
