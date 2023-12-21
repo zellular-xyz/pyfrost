@@ -6,7 +6,7 @@ This module implements the cryptography functions of the FROST protocol as well 
 
 ## Cryptography functions
 
-#### Three Rounds During DKG
+#### Key Generation
 
 - `KeyGen.round1(self) -> Dict`: Initiates the DKG by generating a key pair (securing communication against eavesdropping) and a $t$-degree polynomial for the distributed key.
 - `KeyGen.round2(self, round1_broadcasted_data) -> List[Dict]`: Processes the second round of DKG by handling `round1_broadcasted_data` from other party nodes. It generates data to be shared between node pairs, encrypting it with the sender's private key and the receiver's public key.
