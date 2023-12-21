@@ -1,97 +1,52 @@
 # PyFrost
 
-PyFrost is a library that implements the Flexible Round-Optimized Schnorr Threshold (FROST) Signatures algorithm, as described in [this paper](https://eprint.iacr.org/2020/852.pdf).
+PyFROST is an implementation of the [FROST](https://eprint.iacr.org/2020/852.pdf) protocol in Python. FROST is a Flexible Round-Optimized Schnorr Threshold Signatures protocol that is superior to other threshold signature protocols due to its efficient single-round signing procedure.
 
-In summary, FROST is a cryptographic algorithm designed for threshold signature schemes (TSS). It enhances security and efficiency in decentralized systems by enabling a subset of a group (i.e., the party) to sign messages on behalf of the entire group. The round-optimized design of FROST significantly reduces the number of communication rounds needed to generate a signature, making it more efficient than traditional threshold signature schemes.
+This module implements the cryptography functions of the FROST protocol as well as a network package that includes libp2p clients for node, signature aggregator and distributed key generator.
 
-## Benefits of FROST
+## Cryptography functions
 
-- **Efficiency**: By reducing the number of rounds in the signing process, FROST enhances speed and efficiency in distributed environments.
-- **Scalability**: Its adaptability to various group sizes makes it ideal for large, decentralized networks.
+### Three Rounds During DKG
 
-For more detailed information about TSS, please refer to our documentation through [this link]().
+1. `KeyGen.round1()`: Initiates the DKG by generating a key pair (securing communication against eavesdropping) and a $t$-degree polynomial for the distributed key.
+2. `KeyGen.round2(round1_broadcasted_data)`: Processes the second round of DKG by handling `round1_broadcasted_data` from other party nodes. It generates data to be shared between node pairs, encrypting it with the sender's private key and the receiver's public key.
+3. `KeyGen.round3(round1_broadcasted_data, round2_encrypted_data)`: Calculates the node's share of the distributed key, reporting the share and corresponding key, signed with the node's permanent secret for verification. In case of failure due to other nodes' dishonesty, it reports malicious activity.
+
+### Issuing Signature
+
+1. `create_nonces(node_id: int, number_of_nonces=10)`: This function is `staticmethod` that generate a batch of public-private keys as nonce. This nonces, then use when a client (i.e. signature aggregator (SA)) request signature.
+2. `Key.sign(self, commitments_dict, message: str, nonces: Dict)`:
+   
+### Aggregation & Verification
+
+- `aggregate_signatures(message: str, single_signatures: List[Dict[str, int]], aggregated_public_nonce: Point, group_key: int) -> Dict`
+- `aggregate_nonce(message: str, commitments_dict: Dict[str, Dict[str, int]], group_key: Point)`
+
+- `verify_single_signature(id: int, message: str, commitments_dict: Dict[str, Dict[str, int]], aggregated_public_nonce: Point,
+                            public_key_share: int, single_signature: Dict[str, int], group_key: Point) -> bool`
+- `verify_group_signature(aggregated_signature: Dict) -> bool`
+
+
+## Network package
+
+The network package includes the implementation of the following:
+
+### Node
+A Libp2p client that serves the three rounds of DKG and nonce creation and signing methods.
+
+### Distributed Key Generator
+A Libp2p client that calls the DKG three rounds on the node.
+
+### Signature Aggregator
+A Libp2p client that queries nonces and signatures from the nodes and then aggregates and verifies them.
+
+To use PyFrost to run your TSS network, the following interface classes used by the above clients should be implemented:
+- Data Manager: Functions to store and retrieve the private nonces and keys 
+- Node Info: Provides a list of network nodes and their information
+- Validators: Verifies the roles of signature aggregators and distributed key generators.
 
 ## How to Run Test
 {Clone - Setup venv and install dependencies - run tests}
 
-
-## How to Use This Library 
-{import classes - order of function calls - sample response}
-
-## Functions
-
-In this section, we explain the key functions related to distributed key generation, issuing signatures, and verifying them.
-
-### Distributed Key Generation
-There are three functions for Distributed Key Generation (DKG) and one for resolving complaints and identifying nodes that send invalid data:
-
-1. `Frost.dkg_round1() -> List[Dict]`:
-   Initiates the DKG by generating a key pair (securing communication against eavesdropping) and a $t$-degree polynomial for the distributed key.
-
-   **Inputs:** None
-
-   **Outputs:** A list of `[broadcast, save_data]`
-   - `broadcast`: A dictionary containing data to be broadcast to all other nodes in the party.
-   - `save_data`: Data to be saved in memory or a database.
-  
-2. `Frost.dkg_round2(round1_broadcasted_data, dkg_saved_data) -> List[Dict]`:
-   Processes the second round of DKG by handling `round1_broadcasted_data` from other party nodes. It generates data to be shared between node pairs, encrypting it with the sender's private key and the receiver's public key.
-
-   **Inputs:**
-   - `round1_broadcasted_data`: Data broadcasted in `round1` by all other party nodes.
-   - `dkg_saved_data`: Data saved from `round1` for this node.
-
-   **Outputs:** A list of `[send, save_data]`
-   - `send`: Data to be sent to each node.
-   - `save_data`: Data to be saved in memory or a database.
-
-3. `Frost.dkg_round3(round1_broadcasted_data, round2_encrypted_data, dkg_saved_data) -> Dict`:
-   Calculates the node's share of the distributed key, reporting the share and corresponding key, signed with the node's permanent secret for verification. In case of failure due to other nodes' dishonesty, it reports a malicious activity.
-
-   **Inputs:**
-   - `round1_broadcasted_data`: Data broadcasted in `round1` by all other party nodes.
-   - `round2_encrypted_data`: Data received in `round2` where this node is the receiver.
-   - `dkg_saved_data`: Data saved from `round1` for this node.
-
-   **Outputs:**
-   - A dictionary containing `status` and `data`. If `status` is `SUCCESSFUL`, `data` includes the distributed key, node's share of this key, and a signature. If `status` is `COMPLAINT`, it contains evidence of another node's dishonesty.
-
-4. `Frost.complain(secret_key: int, partner_id: str, partner_public: Point) -> Dict`:
-   Creates a complaint against `partner_id` using the complainer's secret from `round1` and the accused's public key.
-
-   **Inputs:**
-   - `secret_key`: The secret key generated by a node in the first round.
-   - `partner_id`: The ID of the node being complained about.
-   - `partner_public`: The public key of the accused node (from `round1`).
-
-   **Outputs:**
-   - A dictionary with the complaint, evidence, and proof, allowing verification of the accused node's malicious behavior.
-
-### Issuing Signature
-
-To issue FROST signature, we have 2 key functions:
-
-1. `Frost.nonce_preprocess(node_id: int, number_of_nonces=10) -> List[List]`:
-   This function is `staticmethod` that generate a batch of public-private keys as nonce. This nonces, then use when a client (i.e. signature aggregator (SA)) request signature.
-
-     **Inputs:**
-   - `node_id`: The id of the current node.
-   - `number_of_nonces`: The number of nunces to be generated.
-
-   **Outputs:** A list of `[nonce_publics, save_data]`
-   - `nonce_publics`: The public nonces to be send to whome request nonces.
-   - `save_data`: Data to be saved in memory or a database. This data consist of public and private of nonces.
-
-2. `Frost.sign(self, commitments_dict, message: str , nonces : Dict) -> List`:
-   This function 
-
-3. frost_aggregate_signatures(params)
-
-### Verifing Signature
-
-To verify signature we use the following function:
-
-1. frost_aggregate_nonce(params)
-2. frost_verify_group_signature(params)
 
 ## Benchmarks
