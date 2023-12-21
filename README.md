@@ -6,15 +6,18 @@ This module implements the cryptography functions of the FROST protocol as well 
 
 ## Cryptography functions
 
-- `pyfrost.KeyGen.round1(self) -> Dict`
-- `pyfrost.KeyGen.round2(self, round1_broadcasted_data) -> List[Dict]`
-- `pyfrost.KeyGen.round3(self, round2_encrypted_data) -> Dict`
-- `pyfrost.Key.sign(self, commitments_dict, message: str, nonces: Dict) -> str`
-- `pyfrost.aggregate_signatures(message: str, single_signatures: List[Dict[str, int]], aggregated_public_nonce: Point, group_key: int) -> Dict`
-- `pyfrost.create_nonces(node_id: int, number_of_nonces=10) -> List[List]`
-- `pyfrost.aggregate_nonce(message: str, commitments_dict: Dict[str, Dict[str, int]], group_key: Point)`
-- `pyfrost.verify_single_signature(id: int, message: str, commitments_dict: Dict[str, Dict[str, int]], aggregated_public_nonce: Point, public_key_share: int, single_signature: Dict[str, int], group_key: Point) -> bool`
-- `pyfrost.verify_group_signature(aggregated_signature: Dict) -> bool`
+```
+- pyfrost.KeyGen.round1(self) -> Dict
+- pyfrost.KeyGen.round2(self, round1_broadcasted_data)
+- pyfrost.KeyGen.round3(self, round2_encrypted_data)
+- pyfrost.Key.sign(self, commitments_dict, message, nonces)
+- pyfrost.create_nonces(node_id, number_of_nonces)
+- pyfrost.aggregate_nonce(message, commitments_dict, group_key)
+- pyfrost.aggregate_signatures(message, single_signatures, aggregated_public_nonce, group_key)
+- pyfrost.verify_group_signature(aggregated_signature)
+- pyfrost.verify_single_signature(id, message, commitments_dict, aggregated_public_nonce,
+                                  public_key_share, single_signature, group_key)
+```
 
 ## Network package
 
