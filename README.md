@@ -1,6 +1,8 @@
 # PyFrost
 
-PyFROST is an implementation of the [FROST](https://eprint.iacr.org/2020/852.pdf) protocol in Python. FROST is a Flexible Round-Optimized Schnorr Threshold Signatures protocol that is superior to other threshold signature protocols due to its efficient single-round signing procedure.
+PyFrost is an implementation of the [FROST](https://eprint.iacr.org/2020/852.pdf) protocol in Python. FROST is a Flexible Round-Optimized Schnorr Threshold Signatures protocol that is superior to other threshold signature protocols due to its efficient single-round signing procedure. PyFrost adopts the single-round standard FROST protocol for its signing operations, while [Identiable Cheating Entity FROST Signature Protocol](https://eprint.iacr.org/2021/1658.pdf) is employed in the context of DKG to detect and address potential malicious behaviour where cheating entities abort to share secrets selectively with some honest players to exclude them from the DKG process.
+
+[This tutorial](https://github.com/SAYaghoubnejad/pyfrost/wiki/PyFrost-TSS-Protocl) helps get familiar with cryptographic concepts like Threshold Signatures, Distributed Key Generation, Cheating Identification, Standard Schnorr Signatures and Single-Round Schnorr Threshold Signatures which are implemented in the PyFrost module.
 
 This module implements the cryptography functions of the FROST protocol as well as a network package that includes libp2p clients for node, signature aggregator and distributed key generator.
 
