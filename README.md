@@ -15,7 +15,7 @@ pyfrost.create_nonces(node_id, number_of_nonces)
 pyfrost.aggregate_nonce(message, commitments_dict, group_key)
 pyfrost.aggregate_signatures(message, single_signatures, aggregated_public_nonce, group_key)
 pyfrost.verify_group_signature(aggregated_signature)
-pyfrost.verify_single_signature(id, message, commitments_dict, aggregated_public_nonce, public_key_share, single_signature, group_key)
+pyfrost.verify_single_signature(id, message, commitments, aggregated_nonce, public_key, signature, group_key)
 ```
 
 ## Network package
