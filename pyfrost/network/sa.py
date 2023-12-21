@@ -1,5 +1,5 @@
 import json
-from libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
+from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
 import pyfrost
 from .abstract import NodeInfo
 

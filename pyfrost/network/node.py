@@ -1,5 +1,5 @@
 from .libp2p_base import Libp2pBase, PROTOCOLS_ID
-from abstract import NodeInfo, DataManager
+from .abstract import NodeInfo, DataManager
 
 from libp2p.network.stream.net_stream_interface import INetStream
 from libp2p.peer.id import ID as PeerID

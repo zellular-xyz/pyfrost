@@ -1,6 +1,6 @@
 from fastecdsa import keys
 from web3 import Web3
-import crypto_utils as __utils
+from .crypto_utils import *
 from typing import List, Dict
 import json
 from fastecdsa.point import Point
@@ -22,8 +22,8 @@ class KeyGen:
         self.status = 'STARTED'
 
     def round1(self) -> List[Dict]:
-        secret_key, public_key = keys.gen_keypair(__utils.ecurve)
-        secret_nonce, public_nonce = keys.gen_keypair(__utils.ecurve)
+        secret_key, public_key = keys.gen_keypair(ecurve)
+        secret_nonce, public_nonce = keys.gen_keypair(ecurve)
         secret_pop_hash = Web3.solidity_keccak(
             [
                 'string',
@@ -34,27 +34,27 @@ class KeyGen:
             [
                 self.node_id,
                 self.dkg_id,
-                __utils.pub_to_code(public_key),
-                __utils.pub_to_code(public_nonce)
+                pub_to_code(public_key),
+                pub_to_code(public_nonce)
             ],
         )
 
-        secret_pop_sign = __utils.schnorr_sign(
+        secret_pop_sign = schnorr_sign(
             secret_key, secret_nonce, public_nonce, int.from_bytes(
                 secret_pop_hash, 'big')
         )
 
         secret_signature = {
-            'nonce': __utils.pub_to_code(public_nonce),
-            'signature': __utils.stringify_signature(secret_pop_sign),
+            'nonce': pub_to_code(public_nonce),
+            'signature': stringify_signature(secret_pop_sign),
         }
 
         # Generate DKG polynomial
-        fx = __utils.Polynomial(
-            self.threshold, __utils.ecurve, self.coefficient0)
+        fx = Polynomial(
+            self.threshold, ecurve, self.coefficient0)
         public_fx = fx.__coef_pub_keys()
 
-        coef0_nonce, public_coef0_nonce = keys.gen_keypair(__utils.ecurve)
+        coef0_nonce, public_coef0_nonce = keys.gen_keypair(ecurve)
         coef0_pop_hash = Web3.solidity_keccak(
             [
                 'string',
@@ -65,18 +65,18 @@ class KeyGen:
             [
                 self.node_id,
                 self.dkg_id,
-                __utils.pub_to_code(public_fx[0]),
-                __utils.pub_to_code(public_coef0_nonce)
+                pub_to_code(public_fx[0]),
+                pub_to_code(public_coef0_nonce)
             ],
         )
-        coef0_pop_sign = __utils.schnorr_sign(
+        coef0_pop_sign = schnorr_sign(
             fx.coefficients[0], coef0_nonce, public_coef0_nonce, int.from_bytes(
                 coef0_pop_hash, 'big')
         )
 
         coef0_signature = {
-            'nonce': __utils.pub_to_code(public_coef0_nonce),
-            'signature': __utils.stringify_signature(coef0_pop_sign),
+            'nonce': pub_to_code(public_coef0_nonce),
+            'signature': stringify_signature(coef0_pop_sign),
         }
 
         self.round1_local_data = {
@@ -91,16 +91,16 @@ class KeyGen:
 
         return {
             'sender_id': self.node_id,
-            'public_fx': [__utils.pub_to_code(s) for s in public_fx],
+            'public_fx': [pub_to_code(s) for s in public_fx],
             'coefficient0_signature': coef0_signature,
-            'public_key': __utils.pub_to_code(public_key),
+            'public_key': pub_to_code(public_key),
             'secret_signature': secret_signature
         }
 
     def round2(self, round1_broadcasted_data) -> List[Dict]:
         self.round1_broadcasted_data = round1_broadcasted_data
 
-        fx: __utils.Polynomial = self.round1_local_data['fx']
+        fx: Polynomial = self.round1_local_data['fx']
         partners_public_keys = {}
         secret_key = self.round1_local_data['secret_key']
         for data in round1_broadcasted_data:
@@ -118,8 +118,8 @@ class KeyGen:
                 [sender_id, self.dkg_id,    sender_public_fx[0],    sender_coef0_nonce]
             )
 
-            coef0_verification = __utils.schnorr_verify(
-                __utils.code_to_pub(sender_public_fx[0]),
+            coef0_verification = schnorr_verify(
+                code_to_pub(sender_public_fx[0]),
                 int.from_bytes(coef0_pop_hash, 'big'),
                 sender_coef0_signature
             )
@@ -133,8 +133,8 @@ class KeyGen:
                 [sender_id, self.dkg_id, sender_public_key, sender_secret_nonce]
             )
 
-            secret_verification = __utils.schnorr_verify(
-                __utils.code_to_pub(sender_public_key),
+            secret_verification = schnorr_verify(
+                code_to_pub(sender_public_key),
                 int.from_bytes(secret_pop_hash, 'big'),
                 sender_secret_signature
             )
@@ -153,15 +153,15 @@ class KeyGen:
                 pass
         result_data = []
         for id in qualified:
-            encryption_joint_key = __utils.pub_to_code(
-                secret_key * __utils.code_to_pub(partners_public_keys[id]))
-            encryption_key = __utils.generate_hkdf_key(encryption_joint_key)
+            encryption_joint_key = pub_to_code(
+                secret_key * code_to_pub(partners_public_keys[id]))
+            encryption_key = generate_hkdf_key(encryption_joint_key)
             id_as_int = int(id)
             data = {
                 'receiver_id': id,
                 'sender_id': self.node_id,
-                'data': __utils.encrypt(
-                    {'receiver_id': id, 'f': fx.__utils.evaluate(id_as_int)},
+                'data': encrypt(
+                    {'receiver_id': id, 'f': fx.evaluate(id_as_int)},
                     encryption_key
                 )
             }
@@ -183,23 +183,23 @@ class KeyGen:
             sender_id = message['sender_id']
             receiver_id = message['receiver_id']
             encrypted_data = message['data']
-            encryption_joint_key = __utils.pub_to_code(
-                secret_key * __utils.code_to_pub(partners_public_keys[sender_id]))
-            encryption_key = __utils.generate_hkdf_key(encryption_joint_key)
+            encryption_joint_key = pub_to_code(
+                secret_key * code_to_pub(partners_public_keys[sender_id]))
+            encryption_key = generate_hkdf_key(encryption_joint_key)
 
             assert receiver_id == self.node_id, 'ERROR: receiver_id does not match.'
-            data = json.loads(__utils.decrypt(encrypted_data, encryption_key))
+            data = json.loads(decrypt(encrypted_data, encryption_key))
             round2_data.append(data)
             for round1_data in self.round1_broadcasted_data:
                 if round1_data['sender_id'] == sender_id:
                     public_fx = round1_data['public_fx']
 
-                    point1 = __utils.calc_poly_point(
-                        list(map(__utils.code_to_pub, public_fx)),
+                    point1 = calc_poly_point(
+                        list(map(code_to_pub, public_fx)),
                         int(self.node_id)
                     )
 
-                    point2 = data['f'] * __utils.ecurve.G
+                    point2 = data['f'] * ecurve.G
 
                     if point1 != point2:
                         complaints.append(
@@ -214,8 +214,8 @@ class KeyGen:
             self.status = 'COMPLAINT'
             return {'status': 'COMPLAINT', 'data': complaints}
 
-        fx: __utils.Polynomial = self.round1_local_data['fx']
-        my_fragment = fx.__utils.evaluate(int(self.node_id))
+        fx: Polynomial = self.round1_local_data['fx']
+        my_fragment = fx.evaluate(int(self.node_id))
         share_fragments = [my_fragment]
         for data in round2_data:
             share_fragments.append(data['f'])
@@ -223,7 +223,7 @@ class KeyGen:
         public_fx = [self.round1_local_data['public_fx'][0]]
         for data in self.round1_broadcasted_data:
             if data['sender_id'] in self.partners:
-                public_fx.append(__utils.code_to_pub(data['public_fx'][0]))
+                public_fx.append(code_to_pub(data['public_fx'][0]))
 
         dkg_public_key = public_fx[0]
         for i in range(1, len(public_fx)):
@@ -234,8 +234,8 @@ class KeyGen:
 
         result = {
             'data': {
-                'dkg_public_key': __utils.pub_to_code(dkg_public_key),
-                'public_share': __utils.pub_to_code(keys.get_public_key(share, __utils.ecurve)),
+                'dkg_public_key': pub_to_code(dkg_public_key),
+                'public_share': pub_to_code(keys.get_public_key(share, ecurve)),
             },
             'status': 'SUCCESSFUL'
         }
@@ -259,14 +259,14 @@ class Key:
             if nonce_d is None and nonce_e is None:
                 continue
 
-            signature = __utils.single_sign(
+            signature = __single_sign(
                 int(self.node_id),
                 self.dkg_key_pair['share'],
                 nonce_d,
                 nonce_e,
                 message,
                 commitments_dict,
-                __utils.pub_to_code(self.dkg_key_pair['dkg_public_key'])
+                pub_to_code(self.dkg_key_pair['dkg_public_key'])
             )
             remove_data = {
                 'nonce_d_pair': {nonce['public_nonce_d']: nonce_d},
@@ -280,12 +280,12 @@ def create_nonces(node_id: int, number_of_nonces=10) -> List[List]:
     nonce_publics = []
     private_data = []
     for _ in range(number_of_nonces):
-        nonce_d = __utils.generate_random_private()
-        nonce_e = __utils.generate_random_private()
-        public_nonce_d = __utils.pub_to_code(
-            keys.get_public_key(nonce_d, __utils.ecurve))
-        public_nonce_e = __utils.pub_to_code(
-            keys.get_public_key(nonce_e, __utils.ecurve))
+        nonce_d = generate_random_private()
+        nonce_e = generate_random_private()
+        public_nonce_d = pub_to_code(
+            keys.get_public_key(nonce_d, ecurve))
+        public_nonce_e = pub_to_code(
+            keys.get_public_key(nonce_e, ecurve))
 
         private_data.append({
             'nonce_d_pair': {public_nonce_d: nonce_d},
@@ -312,8 +312,8 @@ def verify_single_signature(id: int, message: str, commitments_dict: Dict[str, D
 
     for commitment in commitments_list:
         if commitment['id'] == id:
-            nonce_d_public = __utils.code_to_pub(commitment['public_nonce_d'])
-            nonce_e_public = __utils.code_to_pub(commitment['public_nonce_e'])
+            nonce_d_public = code_to_pub(commitment['public_nonce_d'])
+            nonce_e_public = code_to_pub(commitment['public_nonce_e'])
             row = Web3.solidity_keccak(
                 ['string', 'bytes', 'bytes'],
                 [hex(commitment['id']),  message_hash,  commitments_hash]
@@ -330,21 +330,21 @@ def verify_single_signature(id: int, message: str, commitments_dict: Dict[str, D
             'address'
         ],
         [
-            Web3.to_int(hexstr=__utils.pub_compress(
-                __utils.code_to_pub(group_key))['x']),
-            __pub_compress(__utils.code_to_pub(group_key))['y_parity'],
+            Web3.to_int(hexstr=pub_compress(
+                code_to_pub(group_key))['x']),
+            pub_compress(code_to_pub(group_key))['y_parity'],
             Web3.to_int(message_hash),
-            __utils.pub_to_addr(aggregated_public_nonce)
+            pub_to_addr(aggregated_public_nonce)
         ]
     )
 
-    coef = __utils.langrange_coef(index, len(
+    coef = langrange_coef(index, len(
         commitments_list), commitments_list, 0)
 
     point1 = public_nonce - \
         (int.from_bytes(challenge, 'big') *
-         coef * __utils.code_to_pub(public_key_share))
-    point2 = single_signature['signature'] * __utils.ecurve.G
+         coef * code_to_pub(public_key_share))
+    point2 = single_signature['signature'] * ecurve.G
 
     return point1 == point2
 
@@ -357,8 +357,8 @@ def aggregate_nonce(message: str, commitments_dict: Dict[str, Dict[str, int]], g
     message_hash = Web3.keccak(text=message)
 
     for commitment in commitments_list:
-        nonce_d_public = __utils.code_to_pub(commitment['public_nonce_d'])
-        nonce_e_public = __utils.code_to_pub(commitment['public_nonce_e'])
+        nonce_d_public = code_to_pub(commitment['public_nonce_d'])
+        nonce_e_public = code_to_pub(commitment['public_nonce_e'])
 
         row = Web3.solidity_keccak(
             ['string', 'bytes', 'bytes'],
@@ -380,8 +380,8 @@ def aggregate_signatures(message: str, single_signatures: List[Dict[str, int]], 
     aggregated_signature = 0
     for sign in single_signatures:
         aggregated_signature = aggregated_signature + sign['signature']
-    aggregated_signature = aggregated_signature % __utils.N
-    return {'nonce': __utils.pub_to_addr(aggregated_public_nonce), 'public_key': __utils.pub_compress(__utils.code_to_pub(group_key)),
+    aggregated_signature = aggregated_signature % N
+    return {'nonce': pub_to_addr(aggregated_public_nonce), 'public_key': pub_compress(code_to_pub(group_key)),
             'signature': aggregated_signature, 'message_hash': message_hash}
 
 
@@ -402,9 +402,9 @@ def verify_group_signature(aggregated_signature: Dict) -> bool:
         ]
     )
 
-    point = (aggregated_signature['signature'] * __utils.ecurve.G) + (
-        int.from_bytes(challenge, 'big') * __utils.pub_decompress(aggregated_signature['public_key']))
-    return aggregated_signature['nonce'] == __utils.pub_to_addr(point)
+    point = (aggregated_signature['signature'] * ecurve.G) + (
+        int.from_bytes(challenge, 'big') * pub_decompress(aggregated_signature['public_key']))
+    return aggregated_signature['nonce'] == pub_to_addr(point)
 
 # TODO : exclude complaint
 
@@ -428,12 +428,12 @@ def __single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,
     message_hash = Web3.keccak(text=message)
 
     for commitment in commitments_list:
-        nonce_d_public = __utils.code_to_pub(commitment['public_nonce_d'])
-        nonce_e_public = __utils.code_to_pub(commitment['public_nonce_e'])
-        assert __utils.ecurve.is_point_on_curve(
+        nonce_d_public = code_to_pub(commitment['public_nonce_d'])
+        nonce_e_public = code_to_pub(commitment['public_nonce_e'])
+        assert ecurve.is_point_on_curve(
             (nonce_d_public.x, nonce_d_public.y)
         ), f'Nonce D from Node {commitment["id"]} Not on Curve'
-        assert __utils.ecurve.is_point_on_curve(
+        assert ecurve.is_point_on_curve(
             (nonce_e_public.x, nonce_e_public.y)
         ), f'Nonce E from Node {commitment["id"]} Not on Curve'
 
@@ -464,28 +464,28 @@ def __single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,
             'address'
         ],
         [
-            Web3.to_int(hexstr=__utils.pub_compress(
-                __utils.code_to_pub(group_key))['x']),
-            __utils.pub_compress(__utils.code_to_pub(group_key))['y_parity'],
+            Web3.to_int(hexstr=pub_compress(
+                code_to_pub(group_key))['x']),
+            pub_compress(code_to_pub(group_key))['y_parity'],
             Web3.to_int(message_hash),
-            __utils.pub_to_addr(aggregated_public_nonce)
+            pub_to_addr(aggregated_public_nonce)
         ]
     )
 
-    coef = __utils.langrange_coef(index, len(party), commitments_list, 0)
+    coef = langrange_coef(index, len(party), commitments_list, 0)
     signature_share = (nonce_d + nonce_e * int.from_bytes(my_row, 'big') -
-                       coef * share * int.from_bytes(challenge, 'big')) % __utils.N
+                       coef * share * int.from_bytes(challenge, 'big')) % N
     return {
         'id': id,
         'signature': signature_share,
-        'public_key': __utils.pub_to_code(keys.get_public_key(share, __utils.ecurve)),
-        'aggregated_public_nonce': __utils.pub_to_code(aggregated_public_nonce)
+        'public_key': pub_to_code(keys.get_public_key(share, ecurve)),
+        'aggregated_public_nonce': pub_to_code(aggregated_public_nonce)
     }
 
 
 def __create_complaint(node_id: str, secret_key: int, partner_id: str, partner_public: Point) -> Dict:
-    encryption_joint_key = __utils.pub_to_code(secret_key * partner_public)
-    public_key = keys.get_public_key(secret_key, __utils.ecurve)
+    encryption_joint_key = pub_to_code(secret_key * partner_public)
+    public_key = keys.get_public_key(secret_key, ecurve)
     random_nonce, public_nonce = keys.gen_keypair()
     commitment = random_nonce * partner_public
     complaint_pop_hash = Web3.solidity_keccak(
@@ -497,21 +497,21 @@ def __create_complaint(node_id: str, secret_key: int, partner_id: str, partner_p
             'uint8'
         ],
         [
-            __utils.pub_to_code(public_key),
-            __utils.pub_to_code(partner_public),
+            pub_to_code(public_key),
+            pub_to_code(partner_public),
             encryption_joint_key,
-            __utils.pub_to_code(public_nonce),
-            __utils.pub_to_code(commitment)
+            pub_to_code(public_nonce),
+            pub_to_code(commitment)
         ],
     )
-    complaint_pop_sign = __utils.complaint_sign(
+    complaint_pop_sign = complaint_sign(
         secret_key,
         random_nonce,
         int.from_bytes(complaint_pop_hash, 'big')
     )
     complaint_pop = {
-        'public_nonce': __utils.pub_to_code(public_nonce),
-        'commitment': __utils.pub_to_code(commitment),
+        'public_nonce': pub_to_code(public_nonce),
+        'commitment': pub_to_code(commitment),
         'signature': complaint_pop_sign
     }
 
