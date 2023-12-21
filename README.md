@@ -6,18 +6,18 @@ This module implements the cryptography functions of the FROST protocol as well 
 
 ## Cryptography functions
 
-### Three Rounds During DKG
+#### Three Rounds During DKG
 
 - `KeyGen.round1(self) -> Dict`: Initiates the DKG by generating a key pair (securing communication against eavesdropping) and a $t$-degree polynomial for the distributed key.
 - `KeyGen.round2(self, round1_broadcasted_data) -> List[Dict]`: Processes the second round of DKG by handling `round1_broadcasted_data` from other party nodes. It generates data to be shared between node pairs, encrypting it with the sender's private key and the receiver's public key.
 - `KeyGen.round3(self, round2_encrypted_data) -> Dict`: Calculates the node's share of the distributed key, reporting the share and corresponding key, signed with the node's permanent secret for verification. In case of failure due to other nodes' dishonesty, it reports malicious activity.
 
-### Issuing Signature
+#### Issuing Signature
 
 - `create_nonces(node_id: int, number_of_nonces=10) -> List[List]`: This function generates a batch of nonce keypairs.
 - `Key.sign(self, commitments_dict, message: str, nonces: Dict)`: This function uses the key to sign the message with the provided nonce.
    
-### Aggregation & Verification
+#### Aggregation & Verification
 
 - `aggregate_signatures(message: str, single_signatures: List[Dict[str, int]], aggregated_public_nonce: Point, group_key: int) -> Dict`
 - `aggregate_nonce(message: str, commitments_dict: Dict[str, Dict[str, int]], group_key: Point)`
@@ -31,13 +31,13 @@ This module implements the cryptography functions of the FROST protocol as well 
 
 The network package includes the implementation of the following:
 
-### Node
+#### Node
 A Libp2p client that serves the three rounds of DKG and nonce creation and signing methods.
 
-### Distributed Key Generator
+#### Distributed Key Generator
 A Libp2p client that calls the DKG three rounds on the node.
 
-### Signature Aggregator
+#### Signature Aggregator
 A Libp2p client that queries nonces and signatures from the nodes and then aggregates and verifies them.
 
 To use PyFrost to run your TSS network, the following interface classes used by the above clients should be implemented:
