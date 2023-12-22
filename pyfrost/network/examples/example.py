@@ -1,7 +1,5 @@
 from pyfrost.network.sa import SA
 from pyfrost.network.dkg import Dkg
-from pyfrost.network.node import Node
-from pyfrost.network.libp2p_base import RequestObject, PROTOCOLS_ID
 from configs import PEER_INFO, PRIVATE
 from typing import List, Dict
 from utils import get_new_random_subset
@@ -10,8 +8,6 @@ import logging
 import time
 import timeit
 import trio
-import uuid
-import pprint
 import sys
 import os
 
@@ -33,33 +29,6 @@ async def run_random_party_dkg(dkg: Dkg, selected_nodes: Dict, threshold: int, n
         if result == 'SUCCESSFUL':
             is_completed = True
     return dkg_key
-
-
-async def maintain_nonces(sa: SA, party: Dict, nonces: Dict[str, List], node_info: NodeInfo, min_number_of_nonces: int = 10) -> None:
-    call_method = 'generate_nonces'
-    average_time = []
-    for node_id, peer_id in party.items():
-        nonces.setdefault(node_id, [])
-        start_time = timeit.default_timer()
-        req_id = str(uuid.uuid4())
-        parameters = {
-            'number_of_nonces': min_number_of_nonces * 10,
-        }
-        request_object = RequestObject(req_id, call_method, parameters)
-        nonces_response = {}
-        destination_address = node_info.lookup_node(peer_id)[0]
-        await sa.send(destination_address, peer_id,
-                      PROTOCOLS_ID[call_method], request_object.get(), nonces_response, 50, None)
-
-        logging.debug(
-            f'Nonces dictionary response: \n{pprint.pformat(nonces_response)}')
-        nonces[node_id] += nonces_response[peer_id]['nonces']
-        end_time = timeit.default_timer()
-        logging.info(
-            f'Getting nonces from peer ID {node_id} takes {end_time-start_time} seconds.')
-        average_time.append(end_time-start_time)
-    average_time = sum(average_time) / len(average_time)
-    logging.info(f'Nonce generation average time: {average_time}')
 
 
 async def get_commitments(party: Dict, nonces: Dict[str, List], timeout: int = 5) -> Dict:
@@ -97,7 +66,7 @@ async def run(total_node_number: int, threshold: int, n: int, num_signs: int) ->
     nonces = {}
     async with trio.open_nursery() as nursery:
         nursery.start_soon(dkg.run)
-        await maintain_nonces(sa, selected_nodes, nonces, node_info)
+        nonces = await sa.request_nonces(selected_nodes)
         start_time = timeit.default_timer()
         dkg_key = await run_random_party_dkg(dkg, selected_nodes, threshold, n, node_info)
         end_time = timeit.default_timer()

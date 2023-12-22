@@ -1,13 +1,10 @@
-import json
-from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
-import pyfrost
-from .abstract import NodeInfo
-
 from libp2p.host.host_interface import IHost
 from libp2p.peer.id import ID as PeerID
 from libp2p.typing import TProtocol
-from typing import List, Dict
-
+from typing import Dict
+from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
+from .abstract import NodeInfo
+import pyfrost
 import types
 import pprint
 import trio
@@ -29,22 +26,24 @@ class SA(Libp2pBase):
             self.semaphore = None
         self.default_timeout = default_timeout
 
-    async def request_nonces(self, party: List, number_of_nonces: int = 10):
+    async def request_nonces(self, party: Dict, number_of_nonces: int = 10):
         nonces = {}
-        for peer_id in party:
+        call_method = 'generate_nonces'
+        for node_id, peer_id in party.items():
+            nonces.setdefault(node_id, [])
             req_id = str(uuid.uuid4())
-            call_method = 'generate_nonces'
             parameters = {
-                'number_of_nonces': number_of_nonces,
+                'number_of_nonces': number_of_nonces * 10,
             }
             request_object = RequestObject(req_id, call_method, parameters)
-
+            nonces_response = {}
             destination_address = self.node_info.lookup_node(peer_id)[0]
             await self.send(destination_address, peer_id,
-                            PROTOCOLS_ID[call_method], request_object.get(), nonces, self.default_timeout, self.semaphore)
+                            PROTOCOLS_ID[call_method], request_object.get(), nonces_response, 50, None)
 
             logging.debug(
-                f'Nonces dictionary response: \n{pprint.pformat(nonces)}')
+                f'Nonces dictionary response: \n{pprint.pformat(nonces_response)}')
+            nonces[node_id] += nonces_response[peer_id]['nonces']
         return nonces
 
     async def request_signature(self, dkg_key: Dict, commitments_dict: Dict,
