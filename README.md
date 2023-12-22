@@ -68,7 +68,7 @@ pyfrost.KeyGen(self, dkg_id, threshold, n, node_id, partners, coefficient0=None)
     ```
 
 ```python
-pyfrost.Key(self, dkg_key: Dict, node_id: str)
+pyfrost.Key(self, dkg_key, node_id)
 ```
 - **Description:** This class represents the FROST key that can be used for signing.
 - **Inputs:**
