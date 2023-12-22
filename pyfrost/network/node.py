@@ -3,7 +3,6 @@ from .abstract import NodeInfo, DataManager
 from pyfrost.frost import Key, KeyGen
 from pyfrost import create_nonces
 from libp2p.network.stream.net_stream_interface import INetStream
-from libp2p.peer.id import ID as PeerID
 from libp2p.crypto.secp256k1 import Secp256k1PublicKey
 
 from typing import Dict, List
@@ -234,24 +233,24 @@ class Node(Libp2pBase):
         logging.debug(
             f'{sender_id}{PROTOCOLS_ID["sign"]} Got message: {message}')
         result = {}
-        # try:
-        result = self.data_validator(input_data)
-        key_pair = self.data_manager.get_dkg_key(dkg_id)
+        try:
+            result = self.data_validator(input_data)
+            key_pair = self.data_manager.get_dkg_key(dkg_id)
 
-        key = Key(key_pair, self.node_info.lookup_node(
-            self.peer_id.to_base58())[1])
-        nonces = self.data_manager.get_nonces()
-        result['signature_data'], remove_data = key.sign(
-            commitments_list, result['hash'], nonces)
-        nonces.remove(remove_data)
-        self.data_manager.set_nonces(nonces)
-        result['status'] = 'SUCCESSFUL'
-        # except Exception as e:
-        #     logging.error(
-        #         f'Node=> Exception occurred: {type(e).__name__}: {e}')
-        #     result = {
-        #         'status': 'FAILED'
-        #     }
+            key = Key(key_pair, self.node_info.lookup_node(
+                self.peer_id.to_base58())[1])
+            nonces = self.data_manager.get_nonces()
+            result['signature_data'], remove_data = key.sign(
+                commitments_list, result['hash'], nonces)
+            nonces.remove(remove_data)
+            self.data_manager.set_nonces(nonces)
+            result['status'] = 'SUCCESSFUL'
+        except Exception as e:
+            logging.error(
+                f'Node=> Exception occurred: {type(e).__name__}: {e}')
+            result = {
+                'status': 'FAILED'
+            }
         response = json.dumps(result).encode('utf-8')
         try:
             await stream.write(response)
