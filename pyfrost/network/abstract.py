@@ -24,11 +24,11 @@ class DataManager(ABC):
 
 class NodeInfo(ABC):
     @abstractmethod
-    def lookup_node(self, peer_id: str):
+    def lookup_node(self, peer_id: str, node_id: str = None):
         pass
 
     @abstractmethod
-    def get_all_nodes(self, n: int = None) -> List[str]:
+    def get_all_nodes(self, n: int = None) -> Dict:
         pass
 
 

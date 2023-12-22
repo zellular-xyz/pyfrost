@@ -52,40 +52,27 @@ $ source venv/bin/activate
 
 ## How to Run Example
 
-To run an example network, open `m` additional terminals for `m` nodes and activate the `venv` in these terminals. Note that `m` is an arbitrary positive number, but it must be less than or equal to 99 due to the predefined nodes for testing. Then change the directory to the `tests` folder:
+To run an example network, open `m` additional terminals for `m` nodes and activate the `venv` in these terminals. Note that `m` is an arbitrary positive number, but it must be less than or equal to 99 due to the predefined nodes for running an example. Then change the directory to the `pyfrost/network/examples/` folder:
 
 ```bash
-(venv) $ cd network/examples/
+(venv) $ cd pyfrost/network/examples/
 ```
 
 First, run the nodes. Type the following command in `m` terminals to initiate them:
 
 ```bash
-(venv) $ python node/main.py [0-m]
+(venv) $ python node.py [0-m]
 ```
 
-**Note:** To run multiple nodes and stop them using a single command, you can run the `run_nodes.sh` and `stop_nodes.sh` scripts. First, add execute permission to them by running the following commands:
+After running the nodes wait until the node setup is complete. The setup is finished when the node API is printed along with a message indicating **Waiting for incoming connections...**
+
+Finally, run `example.py` script in the last terminal:
 
 ```bash
-(venv) $ chmod +x run_nodes.sh
-(venv) $ chmod +x stop_nodes.sh
+(venv) $ python example.py [number of nodes you ran] [threshold] [n] [number of signatures]
 ```
 
-Run multiple nodes using this command:
-
-```bash
-(venv) $ ./run_nodes.sh [number of nodes]
-```
-
-After executing either of the above commands, wait until the node setup is complete. The setup is finished when the node API is printed along with a message indicating **Waiting for incoming connections...**
-
-Finally, run `test.py` script in the last terminal:
-
-```bash
-(venv) $ python test.py [number of nodes you ran] [threshold] [n] [number of signatures]
-```
-
-Note that `test.py` implements the functionality for distributed key generation and signature aggregation.
+Note that `example.py` implements the functionality for distributed key generation and signature aggregation.
 
 The script takes 4 parameters as input:
 
@@ -93,12 +80,6 @@ The script takes 4 parameters as input:
 2. `threshold`: The threshold of the FROST algorithm, which is an integer ($t \leq n$).
 3. `n`: The number of nodes cooperating with the DKG to generate a distributed key ($n \leq m$).
 4. `number of signatures`: The number of signatures requested by the signature aggregator upon completion of the Distributed Key Generation (DKG).
-
-If you want to stop all the nodes, type the following command:
-
-```bash
-(venv) $ ./stop_nodes.sh
-```
 
 **Note:** Logs for each node and the signature aggregator are stored in the `./logs` directory.
 

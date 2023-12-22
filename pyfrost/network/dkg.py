@@ -34,9 +34,9 @@ class Dkg(Libp2pBase):
                     round2_data.append(entry)
         return round2_data
 
-    async def request_dkg(self, threshold: int, party: List[str], app_name: str, node_info: NodeInfo) -> Dict:
+    async def request_dkg(self, threshold: int, party: Dict, node_info: NodeInfo) -> Dict:
         logging.info(
-            f'Requesting DKG with threshold: {threshold}, party: {party}, app name: {app_name}.')
+            f'Requesting DKG with threshold: {threshold}, party: {party}')
         dkg_id = str(uuid.uuid4())
 
         if len(party) < threshold:
@@ -54,14 +54,13 @@ class Dkg(Libp2pBase):
         parameters = {
             'party': party,
             'dkg_id': dkg_id,
-            'app_name': app_name,
             'threshold': threshold,
         }
         request_object = RequestObject(dkg_id, call_method, parameters)
         round1_response = {}
         async with trio.open_nursery() as nursery:
-            for peer_id in party:
-                destination_address = self.node_info.lookup_node(peer_id)
+            for node_id, peer_id in party.items():
+                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), round1_response, self.default_timeout, self.semaphore)
 
@@ -80,15 +79,16 @@ class Dkg(Libp2pBase):
             return response
 
         # TODO: error handling (if verification failed)
-        for peer_id, data in round1_response.items():
+        for node_id, data in round1_response.items():
             data_bytes = json.dumps(data['broadcast']).encode('utf-8')
             validation = bytes.fromhex(data['validation'])
+            peer_info = self.node_info.lookup_node(node_id)[0]
             public_key_bytes = bytes.fromhex(
-                self.node_info.lookup_node(peer_id)['public_key'])
+                peer_info['public_key'])
 
             public_key = Secp256k1PublicKey.deserialize(public_key_bytes)
             logging.debug(
-                f'Verification of sent data from {peer_id}: {public_key.verify(data_bytes, validation)}')
+                f'Verification of sent data from {node_id}: {public_key.verify(data_bytes, validation)}')
 
         call_method = 'round2'
         parameters = {
@@ -99,8 +99,8 @@ class Dkg(Libp2pBase):
 
         round2_response = {}
         async with trio.open_nursery() as nursery:
-            for peer_id in party:
-                destination_address = self.node_info.lookup_node(peer_id)
+            for node_id, peer_id in party.items():
+                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), round2_response, self.default_timeout, self.semaphore)
 
@@ -124,14 +124,14 @@ class Dkg(Libp2pBase):
         round3_response = {}
 
         async with trio.open_nursery() as nursery:
-            for peer_id in party:
+            for node_id, peer_id in party.items():
                 parameters = {
                     'dkg_id': dkg_id,
-                    'send_data': self.__gather_round2_data(self.node_info.lookup_node(peer_id)['staking_id'], round2_response)
+                    'send_data': self.__gather_round2_data(node_id, round2_response)
                 }
                 request_object = RequestObject(dkg_id, call_method, parameters)
 
-                destination_address = self.node_info.lookup_node(peer_id)
+                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), round3_response, self.default_timeout, self.semaphore)
 
@@ -163,10 +163,8 @@ class Dkg(Libp2pBase):
         public_shares = {}
         validations = {}
         for id, data in round3_response.items():
-            public_shares[node_info.lookup_node(
-                id)['staking_id']] = data['data']['public_share']
-            validations[node_info.lookup_node(
-                id)['staking_id']] = data['validation']
+            public_shares[self.node_info.lookup_node(id)[1]] = data['data']['public_share']
+            validations[self.node_info.lookup_node(id)[1]] = data['validation']
 
         response = {
             'dkg_id': dkg_id,

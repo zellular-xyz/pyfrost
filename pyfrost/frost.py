@@ -52,7 +52,7 @@ class KeyGen:
         # Generate DKG polynomial
         fx = Polynomial(
             self.threshold, ecurve, self.coefficient0)
-        public_fx = fx.__coef_pub_keys()
+        public_fx = fx.coef_pub_keys()
 
         coef0_nonce, public_coef0_nonce = keys.gen_keypair(ecurve)
         coef0_pop_hash = Web3.solidity_keccak(
@@ -237,6 +237,7 @@ class KeyGen:
                 'dkg_public_key': pub_to_code(dkg_public_key),
                 'public_share': pub_to_code(keys.get_public_key(share, ecurve)),
             },
+            'dkg_key_pair': self.dkg_key_pair,
             'status': 'SUCCESSFUL'
         }
         self.status = 'COMPLETED'
@@ -244,8 +245,9 @@ class KeyGen:
 
 
 class Key:
-    def __init__(self, dkg_key) -> None:
-        self.__dkg_key_pair = dkg_key
+    def __init__(self, dkg_key: Dict, node_id: str) -> None:
+        self.dkg_key_pair = dkg_key
+        self.node_id = node_id
 
     def sign(self, commitments_dict, message: str, nonces: Dict) -> List:
         assert type(message) == str, 'Message should be from string type.'
@@ -258,8 +260,7 @@ class Key:
             nonce_e = pair['nonce_e_pair'].get(nonce['public_nonce_e'])
             if nonce_d is None and nonce_e is None:
                 continue
-
-            signature = __single_sign(
+            signature = single_sign(
                 int(self.node_id),
                 self.dkg_key_pair['share'],
                 nonce_d,
@@ -413,9 +414,8 @@ def verify_group_signature(aggregated_signature: Dict) -> bool:
 # =======================================================================================
 
 
-def __single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,
-                  commitments_dict: Dict[str, Dict[str, int]], group_key: Point) -> Dict[str, int]:
-
+def single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,
+                commitments_dict: Dict[str, Dict[str, int]], group_key: Point) -> Dict[str, int]:
     # commitment = {id: {id , D(i) , E(i)}}
     party = []
     index = 0
