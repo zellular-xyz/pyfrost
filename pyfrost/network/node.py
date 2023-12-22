@@ -35,7 +35,6 @@ class Node(Libp2pBase):
         self.key_gens: Dict[str, KeyGen] = {}
         self.caller_validator = caller_validator
         self.data_validator = data_validator
-        self.round2_broadcast_data = {}
         # Define handlers for various protocol methods
         handlers = {
             'round1': self.round1_handler,

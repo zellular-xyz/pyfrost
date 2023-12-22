@@ -67,7 +67,7 @@ class SA(Libp2pBase):
 
         signatures = {}
         async with trio.open_nursery() as nursery:
-            for node_id, peer_id in sign_party.items():
+            for peer_id in sign_party.values():
                 destination_address = self.node_info.lookup_node(peer_id)[0]
                 nursery.start_soon(Wrappers.sign, self.send, dkg_key, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), signatures, self.default_timeout, self.semaphore)
