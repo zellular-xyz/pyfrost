@@ -269,17 +269,17 @@ class Key:
                 commitments_dict,
                 pub_to_code(self.dkg_key_pair['dkg_public_key'])
             )
-            remove_data = {
+            used_nonce = {
                 'nonce_d_pair': {nonce['public_nonce_d']: nonce_d},
                 'nonce_e_pair': {nonce['public_nonce_e']: nonce_e}
             }
 
-        return signature, remove_data
+        return signature, used_nonce
 
 
 def create_nonces(node_id: int, number_of_nonces=10) -> List[List]:
     nonce_publics = []
-    private_data = []
+    nonce_privates = []
     for _ in range(number_of_nonces):
         nonce_d = generate_random_private()
         nonce_e = generate_random_private()
@@ -288,7 +288,7 @@ def create_nonces(node_id: int, number_of_nonces=10) -> List[List]:
         public_nonce_e = pub_to_code(
             keys.get_public_key(nonce_e, ecurve))
 
-        private_data.append({
+        nonce_privates.append({
             'nonce_d_pair': {public_nonce_d: nonce_d},
             'nonce_e_pair': {public_nonce_e: nonce_e}
         })
@@ -299,7 +299,7 @@ def create_nonces(node_id: int, number_of_nonces=10) -> List[List]:
             'public_nonce_e': public_nonce_e,
         })
 
-    return nonce_publics, private_data
+    return nonce_publics, nonce_privates
 
 
 def verify_single_signature(id: int, message: str, commitments_dict: Dict[str, Dict[str, int]], aggregated_public_nonce: Point,

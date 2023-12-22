@@ -751,7 +751,7 @@ class NodeInfo(BaseNodeInfo):
                 }
             }
         }
-    
+
     def lookup_node(self, peer_id: str, node_id: str = None):
         if node_id is None:
             for node_id, data in self.nodes.items():
@@ -760,7 +760,6 @@ class NodeInfo(BaseNodeInfo):
                     return result, node_id
             return None
         return self.nodes.get(node_id, {}).get(peer_id, None), node_id
-        
 
     def get_all_nodes(self, n: int = None) -> Dict:
         if n is None:
