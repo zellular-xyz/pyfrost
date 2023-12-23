@@ -15,14 +15,10 @@ class KeyGen:
         self.partners: List[str] = partners
         self.coefficient0 = coefficient0
         self.malicious: List = []
-        self.round1_local_data = None
-        self.round1_broadcasted_data = None
-        self.round2_local_data = None
-        self.dkg_key_pair = None
         self.status = 'STARTED'
 
     def round1(self) -> List[Dict]:
-        secret_key, public_key = keys.gen_keypair(ecurve)
+        self.secret_key, public_key = keys.gen_keypair(ecurve)
         secret_nonce, public_nonce = keys.gen_keypair(ecurve)
         secret_pop_hash = Web3.solidity_keccak(
             [
@@ -40,7 +36,7 @@ class KeyGen:
         )
 
         secret_pop_sign = schnorr_sign(
-            secret_key, secret_nonce, public_nonce, int.from_bytes(
+            self.secret_key, secret_nonce, public_nonce, int.from_bytes(
                 secret_pop_hash, 'big')
         )
 
@@ -50,9 +46,9 @@ class KeyGen:
         }
 
         # Generate DKG polynomial
-        fx = Polynomial(
+        self.fx = Polynomial(
             self.threshold, ecurve, self.coefficient0)
-        public_fx = fx.coef_pub_keys()
+        self.public_fx = self.fx.coef_pub_keys()
 
         coef0_nonce, public_coef0_nonce = keys.gen_keypair(ecurve)
         coef0_pop_hash = Web3.solidity_keccak(
@@ -65,34 +61,25 @@ class KeyGen:
             [
                 self.node_id,
                 self.dkg_id,
-                pub_to_code(public_fx[0]),
+                pub_to_code(self.public_fx[0]),
                 pub_to_code(public_coef0_nonce)
             ],
         )
         coef0_pop_sign = schnorr_sign(
-            fx.coefficients[0], coef0_nonce, public_coef0_nonce, int.from_bytes(
+            self.fx.coefficients[0], coef0_nonce, public_coef0_nonce, int.from_bytes(
                 coef0_pop_hash, 'big')
         )
 
-        coef0_signature = {
+        self.coef0_signature = {
             'nonce': pub_to_code(public_coef0_nonce),
             'signature': stringify_signature(coef0_pop_sign),
         }
 
-        self.round1_local_data = {
-            'dkg_id': self.dkg_id,
-            'secret_key': secret_key,
-            'fx': fx,
-            'public_fx': public_fx,
-            'coef0_signature': coef0_signature
-        }
-
         self.status = 'ROUND1'
-
         return {
             'sender_id': self.node_id,
-            'public_fx': [pub_to_code(s) for s in public_fx],
-            'coefficient0_signature': coef0_signature,
+            'public_fx': [pub_to_code(s) for s in self.public_fx],
+            'coefficient0_signature': self.coef0_signature,
             'public_key': pub_to_code(public_key),
             'secret_signature': secret_signature
         }
@@ -100,9 +87,9 @@ class KeyGen:
     def round2(self, round1_broadcasted_data) -> List[Dict]:
         self.round1_broadcasted_data = round1_broadcasted_data
 
-        fx: Polynomial = self.round1_local_data['fx']
-        partners_public_keys = {}
-        secret_key = self.round1_local_data['secret_key']
+        fx: Polynomial = self.fx
+        self.partners_public_keys = {}
+        secret_key = self.secret_key
         for data in round1_broadcasted_data:
             sender_id = data['sender_id']
 
@@ -143,7 +130,7 @@ class KeyGen:
             if not secret_verification or not coef0_verification:
                 # TODO: how to handle complaint
                 self.malicious.append({'id': sender_id, 'complaint': data})
-            partners_public_keys[sender_id] = sender_public_key
+            self.partners_public_keys[sender_id] = sender_public_key
 
         qualified = self.partners
         for node in self.malicious:
@@ -154,7 +141,7 @@ class KeyGen:
         result_data = []
         for id in qualified:
             encryption_joint_key = pub_to_code(
-                secret_key * code_to_pub(partners_public_keys[id]))
+                secret_key * code_to_pub(self.partners_public_keys[id]))
             encryption_key = generate_hkdf_key(encryption_joint_key)
             id_as_int = int(id)
             data = {
@@ -167,16 +154,12 @@ class KeyGen:
             }
             result_data.append(data)
 
-        self.round2_local_data = {
-            'dkg_id': self.dkg_id,
-            'partners_public_keys': partners_public_keys
-        }
         self.status = 'ROUND2'
         return result_data
 
     def round3(self, round2_encrypted_data) -> Dict:
-        secret_key = self.round1_local_data['secret_key']
-        partners_public_keys = self.round2_local_data['partners_public_keys']
+        secret_key = self.secret_key
+        partners_public_keys = self.partners_public_keys
         round2_data = []
         complaints = []
         for message in round2_encrypted_data:
@@ -214,13 +197,13 @@ class KeyGen:
             self.status = 'COMPLAINT'
             return {'status': 'COMPLAINT', 'data': complaints}
 
-        fx: Polynomial = self.round1_local_data['fx']
+        fx: Polynomial = self.fx
         my_fragment = fx.evaluate(int(self.node_id))
         share_fragments = [my_fragment]
         for data in round2_data:
             share_fragments.append(data['f'])
 
-        public_fx = [self.round1_local_data['public_fx'][0]]
+        public_fx = [self.public_fx[0]]
         for data in self.round1_broadcasted_data:
             if data['sender_id'] in self.partners:
                 public_fx.append(code_to_pub(data['public_fx'][0]))
