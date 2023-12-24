@@ -24,7 +24,7 @@ def generate_secrets_and_node_info():
     node_info_dict = {}
     secrets_dict = {}
     last_peer_id = ''
-    for i in range(1, 5):
+    for i in range(1, 100):
         if len(node_info_dict) == 0:
             row_hash = first_secret
         else:
