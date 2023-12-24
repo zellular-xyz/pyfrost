@@ -46,9 +46,10 @@ class SA(Libp2pBase):
             nonces[node_id] += nonces_response[peer_id]['nonces']
         return nonces
 
-    async def request_signature(self, dkg_key: Dict, commitments_dict: Dict,
+    async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
                                 input_data: Dict, sign_party: Dict) -> Dict:
         call_method = 'sign'
+        print ('dkg_key:', dkg_key)
         dkg_id = dkg_key['dkg_id']
         if not set(sign_party).issubset(set(dkg_key['party'])):
             response = {
@@ -59,7 +60,7 @@ class SA(Libp2pBase):
 
         parameters = {
             'dkg_id': dkg_id,
-            'commitments_list': commitments_dict,
+            'nonces_list': nonces_list,
         }
         request_object = RequestObject(
             dkg_id, call_method, parameters, input_data)
@@ -82,7 +83,7 @@ class SA(Libp2pBase):
         }
         if not len(set(aggregated_public_nonces)) == 1:
             aggregated_public_nonce = pyfrost.aggregate_nonce(
-                str_message, commitments_dict, dkg_key['public_key'])
+                str_message, nonces_list, dkg_key['public_key'])
             aggregated_public_nonce = pyfrost.frost.pub_to_code(
                 aggregated_public_nonce)
             for peer_id, data in signatures.items():
@@ -130,10 +131,10 @@ class Wrappers:
 
         sign = result[destination_peer_id]['signature_data']
         msg = result[destination_peer_id]['hash']
-        commitments_dict = message['parameters']['commitments_list']
+        nonces_list = message['parameters']['nonces_list']
         aggregated_public_nonce = pyfrost.frost.code_to_pub(
             sign['aggregated_public_nonce'])
         res = pyfrost.verify_single_signature(
-            sign['id'], msg, commitments_dict, aggregated_public_nonce, dkg_key['public_shares'][str(sign['id'])], sign, dkg_key['public_key'])
+            sign['id'], msg, nonces_list, aggregated_public_nonce, dkg_key['public_shares'][str(sign['id'])], sign, dkg_key['public_key'])
         if not res:
             result[destination_peer_id]['status'] = 'MALICIOUS'

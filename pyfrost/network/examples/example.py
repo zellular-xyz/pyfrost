@@ -1,8 +1,7 @@
 from pyfrost.network.sa import SA
 from pyfrost.network.dkg import Dkg
 from configs import PEER_INFO, PRIVATE
-from typing import List, Dict
-from utils import get_new_random_subset
+from typing import Dict
 from abstracts import NodeInfo
 import logging
 import time
@@ -10,47 +9,7 @@ import timeit
 import trio
 import sys
 import os
-
-
-async def run_random_party_dkg(dkg: Dkg, selected_nodes: Dict, threshold: int, n: int, node_info: NodeInfo) -> None:
-    is_completed = False
-    dkg_key = None
-    while not is_completed:
-        seed = int(time.time())
-        party = get_new_random_subset(selected_nodes, seed, n)
-        now = timeit.default_timer()
-        dkg_key = await dkg.request_dkg(threshold, party, node_info)
-        then = timeit.default_timer()
-        if dkg_key['dkg_id'] == None:
-            exit()
-        result = dkg_key['result']
-        logging.info(f'Requesting DKG takes: {then - now} seconds.')
-        logging.info(f'The DKG result is {result}')
-        if result == 'SUCCESSFUL':
-            is_completed = True
-    return dkg_key
-
-
-async def get_commitments(party: Dict, nonces: Dict[str, List], timeout: int = 5) -> Dict:
-    commitments_dict = {}
-    peer_ids_with_timeout = {}
-    for node_id, peer_id in party.items():
-        with trio.move_on_after(timeout) as cancel_scope:
-            while not nonces.get(node_id):
-                await trio.sleep(0.1)
-            commitment = nonces[node_id].pop()
-            commitments_dict[node_id] = commitment
-        if cancel_scope.cancelled_caught:
-            timeout_response = {
-                'status': 'TIMEOUT',
-                'error': 'Communication timed out',
-            }
-            peer_ids_with_timeout[peer_id] = timeout_response
-
-    if len(peer_ids_with_timeout) > 0:
-        logging.error(
-            f'get_commitments => Timeout error occurred. peer ids with timeout: {peer_ids_with_timeout}')
-    return commitments_dict
+import random
 
 
 async def run(total_node_number: int, threshold: int, n: int, num_signs: int) -> None:
@@ -67,25 +26,42 @@ async def run(total_node_number: int, threshold: int, n: int, num_signs: int) ->
     async with trio.open_nursery() as nursery:
         nursery.start_soon(dkg.run)
         nonces = await sa.request_nonces(selected_nodes)
-        start_time = timeit.default_timer()
-        dkg_key = await run_random_party_dkg(dkg, selected_nodes, threshold, n, node_info)
-        end_time = timeit.default_timer()
+
+        # Random party selection:
+        seed = int(time.time())
+        random.seed(seed)
+        items = list(selected_nodes.items())
+        random_subset = random.sample(items, n)
+        party = dict(random_subset)
+        
+        # Requesting DKG:
+        now = timeit.default_timer()
+        dkg_key = await dkg.request_dkg(threshold, party, node_info)
+        then = timeit.default_timer()
+
+        logging.info(f'Requesting DKG takes: {then - now} seconds.')
+        logging.info(f'The DKG result is {dkg_key["result"]}')
 
         dkg_id = dkg_key['dkg_id']
         logging.info(f'dkg key: {dkg_key}')
-        logging.info(
-            f'Running DKG {dkg_id} takes {end_time - start_time} seconds')
 
         for i in range(num_signs):
             logging.info(
                 f'Get signature {i} with DKG id {dkg_id}')
-            commitments_dict = await get_commitments(dkg_key['party'], nonces)
+
+            dkg_party: Dict = dkg_key['party']
+            nonces_dict = {}
+
+            for node_id in dkg_party.keys():
+                nonce = nonces[node_id].pop()
+                nonces_dict[node_id] = nonce
+
             now = timeit.default_timer()
             input_data = {
                 'data': 'Hi there!'
             }
 
-            signature = await sa.request_signature(dkg_key, commitments_dict, input_data, dkg_key['party'])
+            signature = await sa.request_signature(dkg_key, nonces_dict, input_data, dkg_key['party'])
             then = timeit.default_timer()
 
             logging.info(

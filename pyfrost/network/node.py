@@ -47,7 +47,8 @@ class Node(Libp2pBase):
         self.data_manager: DataManager = data_manager
 
     def add_new_key(self, dkg_id: str, threshold, party: Dict) -> None:
-        assert self.peer_id in list(party.values()), f'This node is not amoung specified party for app {dkg_id}'
+        assert self.peer_id in list(
+            party.values()), f'This node is not amoung specified party for app {dkg_id}'
         assert threshold <= len(
             party), f'Threshold must be <= n for Dkg {dkg_id}'
 
@@ -169,7 +170,9 @@ class Node(Libp2pBase):
             sign_data = json.dumps(round3_data['data']).encode('utf-8')
             round3_data['validation'] = self._key_pair.private_key.sign(
                 sign_data).hex()
-            self.data_manager.set_dkg_key(dkg_id, round3_data['dkg_key_pair'])
+            print('round3:', round3_data['dkg_key_pair'])
+            self.data_manager.set_key(
+                dkg_id, round3_data['dkg_key_pair'])
 
         data = {
             'data': round3_data['data'],
@@ -203,6 +206,7 @@ class Node(Libp2pBase):
             self.peer_id.to_base58())[1]
         nonces, save_data = create_nonces(
             int(node_id), number_of_nonces)
+        print('save_data', save_data)
         self.data_manager.set_nonces(save_data)
         data = {
             'nonces': nonces,
@@ -226,7 +230,7 @@ class Node(Libp2pBase):
         sender_id = stream.muxed_conn.peer_id
         parameters = data['parameters']
         dkg_id = parameters['dkg_id']
-        commitments_list = parameters['commitments_list']
+        nonces_list = parameters['nonces_list']
         input_data = data['input_data']
 
         logging.debug(
@@ -234,13 +238,12 @@ class Node(Libp2pBase):
         result = {}
         try:
             result = self.data_validator(input_data)
-            key_pair = self.data_manager.get_dkg_key(dkg_id)
-
+            key_pair = self.data_manager.get_key(dkg_id)
             key = Key(key_pair, self.node_info.lookup_node(
                 self.peer_id.to_base58())[1])
             nonces = self.data_manager.get_nonces()
             result['signature_data'], remove_data = key.sign(
-                commitments_list, result['hash'], nonces)
+                nonces_list, result['hash'], nonces)
             nonces.remove(remove_data)
             self.data_manager.set_nonces(nonces)
             result['status'] = 'SUCCESSFUL'

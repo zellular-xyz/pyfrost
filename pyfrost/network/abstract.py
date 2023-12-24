@@ -9,16 +9,15 @@ class DataManager(ABC):
         pass
 
     @abstractmethod
-    def set_nonces(self, nonces_list: List) -> None:
-
+    def set_nonces(self, nonces_list) -> None:
         pass
 
     @abstractmethod
-    def set_dkg_key(self,  key, value) -> None:
+    def set_key(self,  key, value) -> None:
         pass
 
     @abstractmethod
-    def get_dkg_key(self, key):
+    def get_key(self, key):
         pass
 
 

@@ -213,7 +213,7 @@ class KeyGen:
             dkg_public_key = dkg_public_key + public_fx[i]
 
         share = sum(share_fragments)
-        self.dkg_key_pair = {'share': share, 'dkg_public_key': dkg_public_key}
+        self.dkg_key_pair = {'share': share, 'dkg_public_key': pub_to_code(dkg_public_key)}
 
         result = {
             'data': {
@@ -230,6 +230,7 @@ class KeyGen:
 class Key:
     def __init__(self, dkg_key: Dict, node_id: str) -> None:
         self.dkg_key_pair = dkg_key
+        self.dkg_key_pair['dkg_public_key'] = code_to_pub(self.dkg_key_pair['dkg_public_key'])
         self.node_id = node_id
 
     def sign(self, commitments_dict: Dict, message: str, nonces: List[Dict]) -> Tuple[Dict, Dict]:
