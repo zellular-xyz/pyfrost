@@ -24,9 +24,17 @@ async def run(total_node_number: int, threshold: int, n: int, num_signs: int) ->
             default_timeout=50, host=dkg.host)
     nonces = {}
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(dkg.run)
-        nonces = await sa.request_nonces(selected_nodes)
 
+        # Run libp2p instance
+        nursery.start_soon(dkg.run)
+
+
+        # Request nonces
+        nonces_response = await sa.request_nonces(selected_nodes)
+        for node_id, peer_id in selected_nodes.items():
+            nonces.setdefault(node_id, [])
+            nonces[node_id] += nonces_response[peer_id]['nonces']
+            
         # Random party selection:
         seed = int(time.time())
         random.seed(seed)
