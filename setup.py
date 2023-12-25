@@ -5,7 +5,6 @@ setup(
     version='0.1',
     packages=find_packages(exclude=['pyfrost/tests', 'pyfrost/network/examples']),
     install_requires=[
-        'trio==0.16',
         'web3==5.31.4',
         'ecpy==1.2.5',
         'numpy==1.26.2',
