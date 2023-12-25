@@ -1,8 +1,9 @@
 from pyfrost.crypto_utils import Polynomial
 from fastecdsa import keys
-from web3 import Web3
-import pyfrost.crypto_utils as Utils
 from pyfrost import frost
+from web3 import Web3
+
+import pyfrost.crypto_utils as Utils
 import random
 import json
 import unittest
