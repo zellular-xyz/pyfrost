@@ -23,7 +23,7 @@ def auth_decorator(handler):
                 # TODO: raise exception and handle it.
         except json.JSONDecodeError:
             logging.error(
-                    'Node Decorator => Error. Unauthorized SA.')
+                'Node Decorator => Error. Unauthorized SA.')
             # TODO: raise exception and handle it.
     return wrapper
 
@@ -240,23 +240,22 @@ class Node(Libp2pBase):
             result = self.data_validator(input_data)
             input_hash = input_data.get('hash')
             app_hash = result['hash']
-            if (input_hash is not None and app_hash == input_hash) or \
-               input_hash is None:
+            result['signature_data'] = {}
+            if (input_hash is not None and app_hash == input_hash) or input_hash is None:
                 key_pair = self.data_manager.get_key(dkg_id)
                 key = Key(key_pair, self.node_info.lookup_node(
                     self.peer_id.to_base58())[1])
                 nonces = self.data_manager.get_nonces()
                 result['signature_data'], remove_data = key.sign(
                     nonces_list, result['hash'], nonces)
-            else:
-                result['signature_data'] = ''
-            try:
-                nonces.remove(remove_data)
-            except Exception as e:
-                logging.error(
-                    f'Node=> Nonces dont\'t exist to remove: {remove_data}')
-            self.data_manager.set_nonces(nonces)
-            result['status'] = 'SUCCESSFUL'
+                try:
+                    nonces.remove(remove_data)
+                except Exception as e:
+                    logging.error(
+                        f'Node=> Nonces dont\'t exist to remove: {remove_data}')
+                self.data_manager.set_nonces(nonces)
+                result['status'] = 'SUCCESSFUL'
+
         except Exception as e:
             logging.error(
                 f'Node=> Exception occurred: {type(e).__name__}: {e}')

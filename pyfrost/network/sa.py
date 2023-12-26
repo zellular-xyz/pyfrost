@@ -46,11 +46,17 @@ class SA(Libp2pBase):
 
     async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
                                 input_data: Dict, sign_party: Dict) -> Dict:
+
         call_method = 'sign'
         dkg_id = dkg_key['dkg_id']
+
+        request_object = RequestObject(
+            dkg_id, call_method, parameters, input_data)
+
         if not set(sign_party).issubset(set(dkg_key['party'])):
             response = {
                 'result': 'FAILED',
+                'request_id': request_object.request_id,
                 'signatures': None
             }
             return response
@@ -59,8 +65,6 @@ class SA(Libp2pBase):
             'dkg_id': dkg_id,
             'nonces_list': nonces_list,
         }
-        request_object = RequestObject(
-            dkg_id, call_method, parameters, input_data)
 
         signatures = {}
         async with trio.open_nursery() as nursery:
@@ -108,6 +112,7 @@ class SA(Libp2pBase):
         if response['result'] == 'FAILED':
             response = {
                 'result': 'FAILED',
+                'request_id': request_object.request_id,
                 'signatures': signatures
             }
             logging.info(f'Signature response: {response}')
@@ -118,11 +123,11 @@ class SA(Libp2pBase):
             aggregated_public_nonces[0])
         aggregated_sign = pyfrost.aggregate_signatures(
             str_message, signs, aggregated_public_nonce, dkg_key['public_key'])
+        aggregated_sign['request_id'] = request_object.request_id
         if pyfrost.frost.verify_group_signature(aggregated_sign):
             aggregated_sign['message_hash'] = aggregated_sign['message_hash'].hex()
             aggregated_sign['result'] = 'SUCCESSFUL'
-            aggregated_sign['signature_data'] = sample_result
-            aggregated_sign['request_id'] = request_object.request_id
+            aggregated_sign['signatures_data'] = sample_result
             logging.info(
                 f'Aggregated sign result: {aggregated_sign["result"]}')
         else:
