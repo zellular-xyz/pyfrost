@@ -73,17 +73,19 @@ class SA(Libp2pBase):
         sample_result = []
         signs = []
         aggregated_public_nonces = []
+        str_message = None
         for data in signatures.values():
             _hash = data.get('hash')
             _signature_data = data.get('signature_data')
             _aggregated_public_nonce = data.get('signature_data',{}).get('aggregated_public_nonce')
-            if _hash:
-                sample_result.append(_hash)
+            if _hash and str_message is None:
+                str_message = _hash
+                sample_result.append(data)
             if _signature_data:
                 signs.append(_signature_data)
             if _aggregated_public_nonce:
                 aggregated_public_nonces.append(_aggregated_public_nonce)
-        str_message = sample_result[0] if len(sample_result) > 0 else None
+        
         response = {
             'result': 'SUCCESSFUL',
             'signatures': None
