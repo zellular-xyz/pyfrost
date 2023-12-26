@@ -130,7 +130,6 @@ class Node(Libp2pBase):
                 f'Verification of sent data from {peer_id}: {public_key.verify(data_bytes, validation)}')
 
         round2_broadcast_data = self.key_gens[dkg_id].round2(broadcasted_data)
-
         data = {
             'broadcast': round2_broadcast_data,
             'status': 'SUCCESSFUL',
@@ -170,7 +169,7 @@ class Node(Libp2pBase):
             sign_data = json.dumps(round3_data['data']).encode('utf-8')
             round3_data['validation'] = self._key_pair.private_key.sign(
                 sign_data).hex()
-            print('round3:', round3_data['dkg_key_pair'])
+
             self.data_manager.set_key(
                 dkg_id, round3_data['dkg_key_pair'])
 
@@ -206,7 +205,6 @@ class Node(Libp2pBase):
             self.peer_id.to_base58())[1]
         nonces, save_data = create_nonces(
             int(node_id), number_of_nonces)
-        print('save_data', save_data)
         self.data_manager.set_nonces(save_data)
         data = {
             'nonces': nonces,
@@ -244,7 +242,12 @@ class Node(Libp2pBase):
             nonces = self.data_manager.get_nonces()
             result['signature_data'], remove_data = key.sign(
                 nonces_list, result['hash'], nonces)
-            nonces.remove(remove_data)
+
+            try:
+                nonces.remove(remove_data)
+            except Exception as e:
+                logging.error(
+                    f'Node=> Nonces dont\'t exist to remove: {remove_data}')
             self.data_manager.set_nonces(nonces)
             result['status'] = 'SUCCESSFUL'
         except Exception as e:

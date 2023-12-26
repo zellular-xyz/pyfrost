@@ -36,7 +36,7 @@ pyfrost.KeyGen(self, dkg_id, threshold, n, node_id, partners, coefficient0=None)
   - **Example:**
     ```python
     >>> key_gen.round1()
-    {Insert output here}
+    {'sender_id': '1', 'public_fx': [354869359782458571095890413565465978453788179974689225985932959388312230579979, 247500362764762459947037982734794064054965566413621565599364790220368476413502], 'coefficient0_signature': {'nonce': 383490719566463586209512810251721527549668124580471769569263292052718615717605, 'signature': '0xcbf8c729dad4e12ed897b4c8be96b7cb5a3eccd4392739eb4b51d039c97ecac77a0d772c7590695cbb2eb138df391ce5eb8e435623800e536cefe8c856805f8b'}, 'public_key': 324477578860614943258278830477072100212788902702977958207661649946147662330559, 'secret_signature': {'nonce': 426048566373482137317695608623139678632846866919427725330338763171376438819092, 'signature': '0x7953fa95c57833fc061b34859c2589ef06372f79fb2da18051b701b105c2684dcf410c15f86505968096b3e4d7ad805a96ca0d1657ae225f694b412a40059f45'}}
     ```
 
   ```python
@@ -50,7 +50,7 @@ pyfrost.KeyGen(self, dkg_id, threshold, n, node_id, partners, coefficient0=None)
   - **Example:**
     ```python
     >>> key_gen.round2(broadcasted_data)
-    {Insert output here}
+    [{'receiver_id': '2', 'sender_id': '1', 'data': 'gAAAAABlipVMSH1zoNxCAWyxWi1JYYH3BK_QR2ikKAmzUfxAyw2NR6baP-UROk2p6EirC6UajvGq-Lvq1d2_WrOoNU0y6G6vlofV_fdYsXLZyxOjpm-l3KtmGrslCRN5sj8X_egMf9hBBA3scTLYRxSC5P3yLrAS4hB4KqWj2N64PsIm_BQmJtH9q-3iX7oYkRPEDSY7Sx6tCJn7Xio3NI17yDzQOpt4Xw=='}]
     ```
 
   ```python
@@ -64,7 +64,7 @@ pyfrost.KeyGen(self, dkg_id, threshold, n, node_id, partners, coefficient0=None)
   - **Example:**
     ```python
     >>> key_gen.round3(secret_data)
-    {Insert output here}
+    {'share': 258184534306628725651417970045960225810129798775481439243461248905229424821005, 'dkg_public_key': 330020007264580023461702987042999164784659928898693899624672734148152731831723}
     ```
 
 ```python
@@ -95,7 +95,7 @@ pyfrost.Key(self, dkg_key, node_id)
   - **Example:**
     ```python
     >>> key.sign(commitments_list, result['hash'], nonces)
-    {Insert output here}
+    ({'id': 1, 'signature': 4380775917818667649812480154896800544056187746415147033529676022466003781424, 'public_key': 242384563336956347086629547533773811569873617465034862979014339799278646286561, 'aggregated_public_nonce': 405219060927290873028863696293410269081074583578299458274783889090092789052128}, {'nonce_d_pair': {370874977114582033781122528087428995876126991915439375306690750715323470958581: 2213281037472537998716995430904520710481785332851970727722116598008453328508}, 'nonce_e_pair': {378212709838154422461267498938698569339673057809356891364745026324345749064958: 89196692178909244182952791960826909494694018849626789515424045125548267120866}})
     ```
 
 ```python
@@ -110,7 +110,7 @@ pyfrost.create_nonces(node_id, number_of_nonces)
 - **Example:**
   ```python
   >>> pyfrost.create_nonces(int(node_id), number_of_nonces)
-  {Insert output here}
+  [{'id': 1, 'public_nonce_d': 305959749411128529065578653080012926400260502965593237683903546682436926831957, 'public_nonce_e': 305142297584683785301649306463683229438777535204575943484807365866294802306735}, {'id': 1, 'public_nonce_d': 437808753910339401580275647953401913867793902236558518392480162633846420791540, 'public_nonce_e': 414707015006718467080421944719135610819227765812054941443016883164601097199535}]
   ```
 
 ```python
@@ -126,7 +126,9 @@ pyfrost.aggregate_nonce(message, commitments_dict, group_key)
 - **Example:**
   ```python
   >>> pyfrost.aggregate_nonce(str_message, commitments_dict, dkg_key['public_key'])
-  {Insert output here}
+  X: 0xc5ae5888e8866bc57531d26ff22a3b8534a2b74ca82fdf445c8dfb50540eb4b1
+  Y: 0x2e944f35abb9a3a9926518bd2bb95cd4092ae6058bdb052dcd857a5b36ed2dc0
+  (On curve <secp256k1>)
   ```
 
 ```python
@@ -143,7 +145,7 @@ pyfrost.aggregate_signatures(message, single_signatures, aggregated_public_nonce
 - **Example:**
   ```python
   >>> pyfrost.aggregate_signatures(str_message, signs, aggregated_public_nonce, dkg_key['public_key'])
-  {Insert output here}
+  {'nonce': '0xc531f2Fff016aeDF48fdb51B199a74306391B13c', 'public_key': {'x': '0xd9a0b467f4f5e5f1a18ca25cb4bb47da95e6a86f2056ee1deeba8f41e7970dab', 'y_parity': 0}, 'signature': 97753292422535281194543953719677706936829466537191776216895420033273107515779, 'message_hash': HexBytes('0x260f59626b383fe31873d9bef3f6a5262af6206e8eb50088da9e41fb9e87dc41')}
   ```
 
 ```python
