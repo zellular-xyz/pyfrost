@@ -19,10 +19,12 @@ def auth_decorator(handler):
                 return await handler(self, stream)
             else:
                 logging.error(
-                    'Node Decorator => Exception occurred. Unauthorized SA.')
-                raise Exception('Unauthorized SA')
+                    'Node Decorator => Error. Unauthorized SA.')
+                # TODO: raise exception and handle it.
         except json.JSONDecodeError:
-            raise Exception('Invalid JSON data')
+            logging.error(
+                    'Node Decorator => Error. Unauthorized SA.')
+            # TODO: raise exception and handle it.
     return wrapper
 
 
