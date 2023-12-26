@@ -238,13 +238,18 @@ class Node(Libp2pBase):
         result = {}
         try:
             result = self.data_validator(input_data)
-            key_pair = self.data_manager.get_key(dkg_id)
-            key = Key(key_pair, self.node_info.lookup_node(
-                self.peer_id.to_base58())[1])
-            nonces = self.data_manager.get_nonces()
-            result['signature_data'], remove_data = key.sign(
-                nonces_list, result['hash'], nonces)
-
+            input_hash = input_data.get('hash')
+            app_hash = result['hash']
+            if (input_hash is not None and app_hash == input_hash) or \
+               input_hash is None:
+                key_pair = self.data_manager.get_key(dkg_id)
+                key = Key(key_pair, self.node_info.lookup_node(
+                    self.peer_id.to_base58())[1])
+                nonces = self.data_manager.get_nonces()
+                result['signature_data'], remove_data = key.sign(
+                    nonces_list, result['hash'], nonces)
+            else:
+                result['signature_data'] = ''
             try:
                 nonces.remove(remove_data)
             except Exception as e:
