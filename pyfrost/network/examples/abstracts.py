@@ -1,6 +1,6 @@
 from pyfrost.network.abstract import Validators, DataManager, NodeInfo as BaseNodeInfo
 from libp2p.typing import TProtocol
-from configs import VALIDATED_CALLERS , generate_secrets_and_node_info
+from config import VALIDATED_CALLERS , generate_secrets_and_node_info
 from itertools import islice
 from typing import Dict, List
 import hashlib
