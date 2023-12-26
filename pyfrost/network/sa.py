@@ -36,17 +36,17 @@ class SA(Libp2pBase):
         nonces_response = {}
         async with trio.open_nursery() as nursery:
             for node_id, peer_id in party.items():
-                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
+                destination_address = self.node_info.lookup_node(peer_id, node_id)[
+                    0]
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), nonces_response, self.default_timeout, self.semaphore)
         logging.debug(
-                f'Nonces dictionary response: \n{pprint.pformat(nonces_response)}')
+            f'Nonces dictionary response: \n{pprint.pformat(nonces_response)}')
         return nonces_response
 
     async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
                                 input_data: Dict, sign_party: Dict) -> Dict:
         call_method = 'sign'
-        print ('dkg_key:', dkg_key)
         dkg_id = dkg_key['dkg_id']
         if not set(sign_party).issubset(set(dkg_key['party'])):
             response = {
@@ -70,10 +70,20 @@ class SA(Libp2pBase):
                                    PROTOCOLS_ID[call_method], request_object.get(), signatures, self.default_timeout, self.semaphore)
         logging.debug(
             f'Signatures dictionary response: \n{pprint.pformat(signatures)}')
-        str_message = [i['hash'] for i in signatures.values()][0]
-        signs = [i['signature_data'] for i in signatures.values()]
-        aggregated_public_nonces = [
-            i['signature_data']['aggregated_public_nonce'] for i in signatures.values()]
+        sample_result = []
+        signs = []
+        aggregated_public_nonces = []
+        for data in signatures.values():
+            _hash = data.get('hash')
+            _signature_data = data.get('signature_data')
+            _aggregated_public_nonce = data.get('signature_data',{}).get('aggregated_public_nonce')
+            if _hash:
+                sample_result.append(_hash)
+            if _signature_data:
+                signs.append(_signature_data)
+            if _aggregated_public_nonce:
+                aggregated_public_nonces.append(_aggregated_public_nonce)
+        str_message = sample_result[0] if len(sample_result) > 0 else None
         response = {
             'result': 'SUCCESSFUL',
             'signatures': None
@@ -106,8 +116,10 @@ class SA(Libp2pBase):
         aggregated_sign = pyfrost.aggregate_signatures(
             str_message, signs, aggregated_public_nonce, dkg_key['public_key'])
         if pyfrost.frost.verify_group_signature(aggregated_sign):
-            aggregated_sign['signatures'] = signatures
+            aggregated_sign['message_hash'] = aggregated_sign['message_hash'].hex()
             aggregated_sign['result'] = 'SUCCESSFUL'
+            aggregated_sign['signature_data'] = sample_result
+            aggregated_sign['request_object'] = request_object
             logging.info(
                 f'Aggregated sign result: {aggregated_sign["result"]}')
         else:
