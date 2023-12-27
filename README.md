@@ -87,9 +87,7 @@ pyfrost.Key(self, dkg_key, node_id)
   ```
   - **Description:** This function generates a part of the signature using the respective share of the distributed key it owns.  
   - **Inputs:**
-    - `commitments_dict` **Dict**: A dictionary containing nonces from all nodes contributing to signature generation (which should be ≥ $t$
-
-).
+    - `commitments_dict` **Dict**: A dictionary containing nonces from all nodes contributing to signature generation (which should be ≥ $t$).
     - `message` **str**: The message to be signed.
     - `nonces` **Dict**: A dictionary containing all the nonces that this node has generated.
   - **Outputs:** 
