@@ -1,6 +1,6 @@
 from pyfrost.network.sa import SA
 from pyfrost.network.dkg import Dkg
-from configs import PEER_INFO, PRIVATE
+from config import PEER_INFO, PRIVATE
 from typing import Dict
 from abstracts import NodeInfo
 import logging

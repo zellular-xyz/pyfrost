@@ -1,6 +1,6 @@
 from pyfrost.network.node import Node
 from abstracts import NodeInfo, NodeDataManager, NodeValidators
-from configs import generate_secrets_and_node_info
+from config import generate_secrets_and_node_info
 import os
 import logging
 import trio
