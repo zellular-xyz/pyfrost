@@ -46,25 +46,21 @@ class SA(Libp2pBase):
 
     async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
                                 input_data: Dict, sign_party: Dict) -> Dict:
-
         call_method = 'sign'
         dkg_id = dkg_key['dkg_id']
-        
+        if not set(sign_party).issubset(set(dkg_key['party'])):
+            response = {
+                'result': 'FAILED',
+                'signatures': None
+            }
+            return response
+
         parameters = {
             'dkg_id': dkg_id,
             'nonces_list': nonces_list,
         }
-
         request_object = RequestObject(
             dkg_id, call_method, parameters, input_data)
-
-        if not set(sign_party).issubset(set(dkg_key['party'])):
-            response = {
-                'result': 'FAILED',
-                'request_id': request_object.request_id,
-                'signatures': None
-            }
-            return response
 
         signatures = {}
         async with trio.open_nursery() as nursery:
@@ -95,11 +91,7 @@ class SA(Libp2pBase):
             'result': 'SUCCESSFUL',
             'signatures': None
         }
-        for data in signatures.values():
-            if data['status'] in ['MALICIOUS', 'ERROR', 'COMPLAINT']:
-                response['result'] = 'FAILED'
-                break
-        if not len(set(aggregated_public_nonces)) == 1 and response['result'] != 'FAILED':
+        if not len(set(aggregated_public_nonces)) == 1:
             aggregated_public_nonce = pyfrost.aggregate_nonce(
                 str_message, nonces_list, dkg_key['public_key'])
             aggregated_public_nonce = pyfrost.frost.pub_to_code(
@@ -108,12 +100,14 @@ class SA(Libp2pBase):
                 if data['signature_data']['aggregated_public_nonce'] != aggregated_public_nonce:
                     data['status'] = 'MALICIOUS'
                     response['result'] = 'FAILED'
-        
+        for data in signatures.values():
+            if data['status'] == 'MALICIOUS':
+                response['result'] = 'FAILED'
+                break
 
         if response['result'] == 'FAILED':
             response = {
                 'result': 'FAILED',
-                'request_id': request_object.request_id,
                 'signatures': signatures
             }
             logging.info(f'Signature response: {response}')
@@ -124,24 +118,16 @@ class SA(Libp2pBase):
             aggregated_public_nonces[0])
         aggregated_sign = pyfrost.aggregate_signatures(
             str_message, signs, aggregated_public_nonce, dkg_key['public_key'])
-        res = {}
-        print ('str_message:', str_message)
-        print ('signs:', signs)
-        print ('aggregated nonce:', aggregated_public_nonce)
-        print ('dkg key:', dkg_key['public_key'])
         if pyfrost.frost.verify_group_signature(aggregated_sign):
-            res = aggregated_sign
-            res['request_id'] = request_object.request_id
-            res['message_hash'] = res['message_hash'].hex()
-            res['result'] = 'SUCCESSFUL'
-            res['signatures_data'] = sample_result
+            aggregated_sign['message_hash'] = aggregated_sign['message_hash'].hex()
+            aggregated_sign['result'] = 'SUCCESSFUL'
+            aggregated_sign['signature_data'] = sample_result
+            aggregated_sign['request_id'] = request_object.request_id
             logging.info(
-                f'Aggregated sign result: {res["result"]}')
+                f'Aggregated sign result: {aggregated_sign["result"]}')
         else:
             aggregated_sign['result'] = 'FAILED'
-            res = aggregated_sign
-            res['request_id'] = request_object.request_id
-        return res
+        return aggregated_sign
 
 
 class Wrappers:

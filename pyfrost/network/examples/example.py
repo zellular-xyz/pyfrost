@@ -66,9 +66,7 @@ async def run(total_node_number: int, threshold: int, n: int, num_signs: int) ->
 
             now = timeit.default_timer()
             input_data = {
-                'data': {
-                    'message': 'Hi there!'
-                }
+                'data': 'Hi there!'
             }
 
             signature = await sa.request_signature(dkg_key, nonces_dict, input_data, dkg_key['party'])
@@ -98,7 +96,7 @@ if __name__ == '__main__':
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(logging.INFO)
 
     sys.set_int_max_str_digits(0)
 

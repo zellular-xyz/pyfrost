@@ -1,6 +1,6 @@
 from pyfrost.network.abstract import Validators, DataManager, NodeInfo as BaseNodeInfo
 from libp2p.typing import TProtocol
-from config import VALIDATED_CALLERS , generate_node_info_and_secrets
+from config import VALIDATED_CALLERS , generate_secrets_and_node_info
 from itertools import islice
 from typing import Dict, List
 import hashlib
@@ -38,7 +38,9 @@ class NodeValidators(Validators):
 
     @staticmethod
     def data_validator(input_data: Dict):
-        result = input_data
+        result = {
+            'data': input_data
+        }
         hash_obj = hashlib.sha3_256(json.dumps(result['data']).encode())
         hash_hex = hash_obj.hexdigest()
         result['hash'] = hash_hex
@@ -47,7 +49,7 @@ class NodeValidators(Validators):
 
 class NodeInfo(BaseNodeInfo):
     def __init__(self):
-        self.nodes, _ = generate_node_info_and_secrets()
+        self.nodes, _ = generate_secrets_and_node_info()
     def lookup_node(self, peer_id: str, node_id: str = None):
         if node_id is None:
             for node_id, data in self.nodes.items():
