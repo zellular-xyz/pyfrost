@@ -236,32 +236,39 @@ class Node(Libp2pBase):
         logging.debug(
             f'{sender_id}{PROTOCOLS_ID["sign"]} Got message: {message}')
         result = {}
-        try:
-            result = self.data_validator(input_data)
-            input_hash = input_data.get('hash')
-            app_hash = result['hash']
-            result['signature_data'] = {}
-            if (input_hash is not None and app_hash == input_hash) or input_hash is None:
-                key_pair = self.data_manager.get_key(dkg_id)
-                key = Key(key_pair, self.node_info.lookup_node(
-                    self.peer_id.to_base58())[1])
-                nonces = self.data_manager.get_nonces()
-                result['signature_data'], remove_data = key.sign(
-                    nonces_list, result['hash'], nonces)
-                try:
-                    nonces.remove(remove_data)
-                except Exception as e:
-                    logging.error(
-                        f'Node=> Nonces dont\'t exist to remove: {remove_data}')
-                self.data_manager.set_nonces(nonces)
-                result['status'] = 'SUCCESSFUL'
+        #try:
+        if input_data.get('reqId') is None:
+            input_data['reqId'] = data['request_id']
+        result = self.data_validator(input_data)
+        input_hash = input_data.get('data', {}).get('hash')
+        app_hash = '0x' + result['hash']
+        result['signature_data'] = {}
+        print('input data:', input_data)
+        print('input_hash:', input_hash)
+        print('app_hash:', app_hash)
+        result['status'] = 'ERROR'
+        if not result.get('error') and ((input_hash is not None and app_hash == input_hash) or input_hash is None):
+            key_pair = self.data_manager.get_key(dkg_id)
+            key = Key(key_pair, self.node_info.lookup_node(
+                self.peer_id.to_base58())[1])
+            nonces = self.data_manager.get_nonces()
+            print ('to sign:', result['hash'])
+            result['signature_data'], remove_data = key.sign(
+                nonces_list, result['hash'], nonces)
+            try:
+                nonces.remove(remove_data)
+            except Exception as e:
+                logging.error(
+                    f'Node=> Nonces dont\'t exist to remove: {remove_data}')
+            self.data_manager.set_nonces(nonces)
+            result['status'] = 'SUCCESSFUL'
 
-        except Exception as e:
-            logging.error(
-                f'Node=> Exception occurred: {type(e).__name__}: {e}')
-            result = {
-                'status': 'FAILED'
-            }
+        # except Exception as e:
+        #     logging.error(
+        #         f'Node=> Exception occurred: {type(e).__name__}: {e}')
+        #     result = {
+        #         'status': 'ERROR'
+        #     }
         response = json.dumps(result).encode('utf-8')
         try:
             await stream.write(response)

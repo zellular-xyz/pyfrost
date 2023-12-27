@@ -19,7 +19,7 @@ VALIDATED_CALLERS = {
 }
 
 
-def generate_secrets_and_node_info():
+def generate_node_info_and_secrets():
     first_secret = b'\x91\x82\xc5\xa1\xcaK\xf1\xf3\xa2"{!\x93%#\x91\xd1`k|\xa8\xa2\r\xc7\xb9.\xb2\xaa>\xf3}\xa3'
     node_info_dict = {}
     secrets_dict = {}

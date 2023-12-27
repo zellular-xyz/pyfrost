@@ -1,6 +1,6 @@
 from pyfrost.network.node import Node
 from abstracts import NodeInfo, NodeDataManager, NodeValidators
-from config import generate_secrets_and_node_info
+from config import generate_node_info_and_secrets
 import os
 import logging
 import trio
@@ -11,7 +11,7 @@ async def run_node(node_number: int) -> None:
     data_manager = NodeDataManager()
     node_info = NodeInfo()
     node_peer_id = node_info.get_all_nodes()[str(node_number+1)][0]
-    _, secrets = generate_secrets_and_node_info()
+    _, secrets = generate_node_info_and_secrets()
     node = Node(data_manager, node_info.lookup_node(node_peer_id)[0], secrets[node_peer_id], node_info,
                 NodeValidators.caller_validator, NodeValidators.data_validator)
     await node.run()
