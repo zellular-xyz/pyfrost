@@ -242,6 +242,14 @@ $ source venv/bin/activate
 
 **Note:** Python version `3.10` is required.
 
+## How to Run Tests
+
+To run tests, navigate to the root directory and run the fallowing command:
+
+```bash
+(venv) $ python run_tests.py 
+```
+
 ## How to Run an Example
 
 To run an example network, open `m` additional terminals for `m` nodes and activate the `venv` in these terminals. Note that `m` is an arbitrary positive number, but it must not exceed 99 due to predefined nodes in the example setup. Then navigate to the `pyfrost/network/examples/` directory:
@@ -279,14 +287,14 @@ The script requires 4 parameters:
 
 The following benchmarks were conducted on an Intel i7-6700HQ with 8 cores and 16GB RAM. (All times are in seconds)
 
-| Benchmark                     | DKG Time | Avg. Time per Node for Nonce Generation | Signing Time |
-|-------------------------------|----------|----------------------------------------|--------------|
-|  7 of 10                      | 0.840 sec| 0.352 sec                              | 0.135 sec    | 
-| 15 of 20                      | 5.435 sec| 0.344 sec                              | 0.380 sec    |
-| 25 of 30                      |14.183 sec| 0.345 sec                              | 0.601 sec    |
+| Benchmark | DKG Time   | Avg. Time per Node for Nonce Generation | Signing Time |
+| --------- | ---------- | --------------------------------------- | ------------ |
+| 7 of 10   | 0.840 sec  | 0.352 sec                               | 0.135 sec    |
+| 15 of 20  | 5.435 sec  | 0.344 sec                               | 0.380 sec    |
+| 25 of 30  | 14.183 sec | 0.345 sec                               | 0.601 sec    |
 
 For the non-local evaluation, we utilized 30 node containers spread across three countries and four cities. Additionally, the Signature Aggregator was configured with dual vCPUs and 8GB of RAM.
 
-| Benchmark                     | DKG Time | Avg. Time per Node for Nonce Generation | Signing Time |
-|-------------------------------|----------|----------------------------------------|--------------|
-| 25 of 30                      | 7.400 sec| 1.594 sec                              | 0.725 sec    |
+| Benchmark | DKG Time  | Avg. Time per Node for Nonce Generation | Signing Time |
+| --------- | --------- | --------------------------------------- | ------------ |
+| 25 of 30  | 7.400 sec | 1.594 sec                               | 0.725 sec    |
