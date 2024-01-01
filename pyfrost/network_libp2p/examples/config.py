@@ -1,4 +1,4 @@
-from pyfrost.network.libp2p_base import PROTOCOLS_ID
+from pyfrost.network_libp2p.libp2p_base import PROTOCOLS_ID
 from libp2p.crypto.secp256k1 import create_new_key_pair
 from libp2p.peer.id import ID as PeerID
 import random
@@ -37,9 +37,11 @@ def generate_secrets_and_node_info():
         peer_id: PeerID = PeerID.from_pubkey(key_pair.public_key)
         last_peer_id = peer_id.to_base58()
         node_info_dict[str(i)] = {
-            last_peer_id: {'public_key': key_pair.public_key.serialize().hex(),
-                           'ip': '127.0.0.1',
-                           'port': str(5000+i)}
+            last_peer_id: {
+                'public_key': key_pair.public_key.serialize().hex(),
+                'ip': '127.0.0.1',
+                'port': str(5000+i)
+            }
         }
         secrets_dict[last_peer_id] = new_secret.hex()
     return node_info_dict, secrets_dict

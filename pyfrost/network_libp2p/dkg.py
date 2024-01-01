@@ -6,7 +6,6 @@ from typing import List, Dict
 from .abstract import NodeInfo
 from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
 
-import pprint
 import trio
 import logging
 import json
@@ -65,7 +64,7 @@ class Dkg(Libp2pBase):
                                    PROTOCOLS_ID[call_method], request_object.get(), round1_response, self.default_timeout, self.semaphore)
 
         logging.debug(
-            f'Round1 dictionary response: \n{pprint.pformat(round1_response)}')
+            f'Round1 dictionary response: \n{json.dumps(round1_response, indent=4)}')
         for response in round1_response.values():
             if response['status'] == 'SUCCESSFUL':
                 continue
@@ -105,7 +104,7 @@ class Dkg(Libp2pBase):
                                    PROTOCOLS_ID[call_method], request_object.get(), round2_response, self.default_timeout, self.semaphore)
 
         logging.debug(
-            f'Round2 dictionary response: \n{pprint.pformat(round2_response)}')
+            f'Round2 dictionary response: \n{json.dumps(round2_response,indent=4)}')
 
         for response in round2_response.values():
             if response['status'] == 'SUCCESSFUL':
@@ -136,7 +135,7 @@ class Dkg(Libp2pBase):
                                    PROTOCOLS_ID[call_method], request_object.get(), round3_response, self.default_timeout, self.semaphore)
 
         logging.debug(
-            f'Round3 dictionary response: \n{pprint.pformat(round3_response)}')
+            f'Round3 dictionary response: \n{json.dumps(round3_response, indent=4)}')
 
         for response in round3_response.values():
             if response['status'] == 'SUCCESSFUL':

@@ -1,5 +1,5 @@
-from pyfrost.network.sa import SA
-from pyfrost.network.dkg import Dkg
+from pyfrost.network_libp2p.sa import SA
+from pyfrost.network_libp2p.dkg import Dkg
 from config import PEER_INFO, PRIVATE
 from typing import Dict
 from abstracts import NodeInfo
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(logging.DEBUG)
 
     sys.set_int_max_str_digits(0)
 

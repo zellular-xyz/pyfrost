@@ -161,7 +161,6 @@ class Node(Libp2pBase):
 
         logging.debug(
             f'{sender_id}{PROTOCOLS_ID["round3"]} Got message: {message}')
-
         round3_data = self.key_gens[dkg_id].round3(send_data)
         if round3_data['status'] == 'COMPLAINT':
             self.remove_key(dkg_id)

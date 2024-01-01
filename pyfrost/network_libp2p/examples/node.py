@@ -1,4 +1,4 @@
-from pyfrost.network.node import Node
+from pyfrost.network_libp2p.node import Node
 from abstracts import NodeInfo, NodeDataManager, NodeValidators
 from config import generate_secrets_and_node_info
 import os
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(logging.DEBUG)
     sys.set_int_max_str_digits(0)
     node_number = int(sys.argv[1])
     try:

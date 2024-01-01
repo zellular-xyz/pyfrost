@@ -6,7 +6,7 @@ from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
 from .abstract import NodeInfo
 import pyfrost
 import types
-import pprint
+import json
 import trio
 import logging
 import uuid
@@ -41,7 +41,7 @@ class SA(Libp2pBase):
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), nonces_response, self.default_timeout, self.semaphore)
         logging.debug(
-            f'Nonces dictionary response: \n{pprint.pformat(nonces_response)}')
+            f'Nonces dictionary response: \n{json.dumps(nonces_response, indent=4)}')
         return nonces_response
 
     async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
@@ -69,7 +69,7 @@ class SA(Libp2pBase):
                 nursery.start_soon(Wrappers.sign, self.send, dkg_key, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), signatures, self.default_timeout, self.semaphore)
         logging.debug(
-            f'Signatures dictionary response: \n{pprint.pformat(signatures)}')
+            f'Signatures dictionary response: \n{json.dumps(signatures, indent=4)}')
         sample_result = []
         signs = []
         aggregated_public_nonces = []
