@@ -452,7 +452,7 @@ def single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,
     }
 
 
-def __create_complaint(node_id: str, secret_key: int, partner_id: str, partner_public: Point) -> Dict:
+def create_complaint(node_id: str, secret_key: int, partner_id: str, partner_public: Point) -> Dict:
     # Calculate joint encryption key and public key
     encryption_joint_key = pub_to_code(secret_key * partner_public)
     public_key = keys.get_public_key(secret_key, ecurve)
