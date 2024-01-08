@@ -120,7 +120,7 @@ class SA(Libp2pBase):
         aggregated_sign = pyfrost.aggregate_signatures(
             str_message, signs, aggregated_public_nonce, dkg_key['public_key'])
         if pyfrost.frost.verify_group_signature(aggregated_sign):
-            aggregated_sign['message_hash'] = aggregated_sign['message_hash'].hex()
+            aggregated_sign['message_hash'] = str_message
             aggregated_sign['result'] = 'SUCCESSFUL'
             aggregated_sign['signature_data'] = sample_result
             aggregated_sign['request_id'] = request_object.request_id
