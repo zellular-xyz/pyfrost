@@ -15,15 +15,26 @@ import types
 def auth_decorator(handler):
     async def wrapper(self, stream: INetStream):
         try:
-            if self.caller_validator(stream.muxed_conn.peer_id.to_base58(), stream.get_protocol()):
-                return await handler(self, stream)
+            sender_id = stream.muxed_conn.peer_id
+            if self.caller_validator(sender_id.to_base58(), stream.get_protocol()):
+                message = await stream.read()
+                message = message.decode('utf-8')
+                data = json.loads(message)
+                logging.debug(
+                    f'{sender_id}{PROTOCOLS_ID["round1"]} Got message: {json.dumps(data, indent=4)}')
+                data = await handler(self, data)
+                response = json.dumps(data).encode('utf-8')
+                await stream.write(response)
+                logging.debug(
+                    f'{sender_id}{PROTOCOLS_ID["round1"]} Sent message: {json.dumps(data, indent=4)}')
+                await stream.close()
             else:
                 logging.error(
                     'Node Decorator => Error. Unauthorized SA.')
                 # TODO: raise exception and handle it.
-        except json.JSONDecodeError:
+        except Exception as e:
             logging.error(
-                'Node Decorator => Error. Unauthorized SA.')
+                f'Node => Exception occurred: {type(e).__name__}: {e}')
             # TODO: raise exception and handle it.
     return wrapper
 
@@ -37,6 +48,7 @@ class Node(Libp2pBase):
         self.key_gens: Dict[str, KeyGen] = {}
         self.caller_validator = caller_validator
         self.data_validator = data_validator
+
         # Define handlers for various protocol methods
         handlers = {
             'round1': self.round1_handler,
@@ -67,25 +79,16 @@ class Node(Libp2pBase):
             # TODO: Maybe remove from database.
 
     @auth_decorator
-    async def round1_handler(self, stream: INetStream) -> None:
+    async def round1_handler(self, data: Dict) -> None:
 
-        message = await stream.read()
-        message = message.decode('utf-8')
-        data = json.loads(message)
-
-        sender_id = stream.muxed_conn.peer_id
         parameters = data['parameters']
         dkg_id = parameters['dkg_id']
-
-        logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["round1"]} Got message: {json.dumps(data, indent=4)}')
 
         self.add_new_key(
             dkg_id,
             parameters['threshold'],
             parameters['party'],
         )
-
         round1_broadcast_data = self.key_gens[dkg_id].round1()
         broadcast_bytes = json.dumps(round1_broadcast_data).encode('utf-8')
         # TODO: check sign necessity of the round1
@@ -94,31 +97,14 @@ class Node(Libp2pBase):
             'validation': self._key_pair.private_key.sign(broadcast_bytes).hex(),
             'status': 'SUCCESSFUL',
         }
-        response = json.dumps(data).encode('utf-8')
-        try:
-            await stream.write(response)
-            logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["round1"]} Sent message: {json.dumps(data, indent=4)}')
-        except Exception as e:
-            logging.error(
-                f'Node => Exception occurred: {type(e).__name__}: {e}')
-
-        await stream.close()
+        return data
 
     @auth_decorator
-    async def round2_handler(self, stream: INetStream) -> None:
+    async def round2_handler(self, data: Dict) -> None:
 
-        message = await stream.read()
-        message = message.decode('utf-8')
-        data = json.loads(message)
-
-        sender_id = stream.muxed_conn.peer_id
         parameters = data['parameters']
         dkg_id = parameters['dkg_id']
         whole_broadcasted_data = parameters['broadcasted_data']
-
-        logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["round2"]} Got message: {json.dumps(data, indent=4)}')
 
         broadcasted_data = []
         for peer_id, data in whole_broadcasted_data.items():
@@ -137,31 +123,15 @@ class Node(Libp2pBase):
             'broadcast': round2_broadcast_data,
             'status': 'SUCCESSFUL',
         }
-        response = json.dumps(data).encode('utf-8')
-        try:
-            await stream.write(response)
-            logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["round2"]} Sent message: {json.dumps(data, indent=4)}')
-        except Exception as e:
-            logging.error(
-                f'Node => Exception occurred: {type(e).__name__}: {e}')
-
-        await stream.close()
+        return data
 
     @auth_decorator
-    async def round3_handler(self, stream: INetStream) -> None:
-
-        message = await stream.read()
-        message = message.decode('utf-8')
-        data = json.loads(message)
-
-        sender_id = stream.muxed_conn.peer_id
+    async def round3_handler(self, data: Dict) -> None:
+        
         parameters = data['parameters']
         dkg_id = parameters['dkg_id']
         send_data = parameters['send_data']
 
-        logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["round3"]} Got message: {json.dumps(data, indent=4)}')
         round3_data = self.key_gens[dkg_id].round3(send_data)
         if round3_data['status'] == 'COMPLAINT':
             self.remove_key(dkg_id)
@@ -180,29 +150,14 @@ class Node(Libp2pBase):
             'status': round3_data['status'],
             'validation': round3_data['validation']
         }
-        response = json.dumps(data).encode('utf-8')
-        try:
-            await stream.write(response)
-            logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["round3"]} Sent message: {json.dumps(data, indent=4)}')
-        except Exception as e:
-            logging.error(
-                f'Node => Exception occurred: {type(e).__name__}: {e}')
-
-        await stream.close()
+        return data
 
     @auth_decorator
-    async def generate_nonces_handler(self, stream: INetStream) -> None:
-        message = await stream.read()
-        message = message.decode('utf-8')
-        data = json.loads(message)
+    async def generate_nonces_handler(self, data: Dict) -> None:
 
-        sender_id = stream.muxed_conn.peer_id
         parameters = data['parameters']
         number_of_nonces = parameters['number_of_nonces']
 
-        logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["generate_nonces"]} Got message: {json.dumps(data, indent=4)}')
         node_id = self.nodes_info.lookup_node(
             self.peer_id.to_base58())[1]
         nonces, save_data = create_nonces(
@@ -212,29 +167,15 @@ class Node(Libp2pBase):
             'nonces': nonces,
             'status': 'SUCCESSFUL',
         }
-        response = json.dumps(data).encode('utf-8')
-        try:
-            await stream.write(response)
-            logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["generate_nonces"]} Sent message: {json.dumps(data, indent=4)}')
-        except Exception as e:
-            logging.error(
-                f'Node=> Exception occurred: {type(e).__name__}: {e}')
-        await stream.close()
+        return data
 
     @auth_decorator
-    async def sign_handler(self, stream: INetStream) -> None:
-        message = await stream.read()
-        message = message.decode('utf-8')
-        data = json.loads(message)
-        sender_id = stream.muxed_conn.peer_id
+    async def sign_handler(self, data: Dict) -> None:
         parameters = data['parameters']
         dkg_public_key = parameters['dkg_public_key']
         nonces_list = parameters['nonces_list']
         sa_data = data['data']
 
-        logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["sign"]} Got message: {json.dumps(data, indent=4)}')
         result = {}
         try:
             result = self.data_validator(sa_data)
@@ -258,13 +199,4 @@ class Node(Libp2pBase):
             result = {
                 'status': 'FAILED'
             }
-        response = json.dumps(result).encode('utf-8')
-        try:
-            await stream.write(response)
-            logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["sign"]} Sent message: {json.dumps(data, indent=4)}')
-        except Exception as e:
-            logging.error(
-                f'Node=> Exception occurred: {type(e).__name__}: {e}')
-
-        await stream.close()
+        return result
