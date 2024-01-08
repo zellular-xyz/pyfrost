@@ -62,18 +62,18 @@ class TestCaseKey(unittest.TestCase):
 
         msg = 'Hello Frost'
         sign_subset = random.sample(sign_keys, T)
-        commitments_data = {}
+        nonces_data = {}
         for key in sign_subset:
-            commitment = saved_data['common_data'][key.node_id].pop()
-            commitments_data[key.node_id] = commitment
+            nonce = saved_data['common_data'][key.node_id].pop()
+            nonces_data[key.node_id] = nonce
         signs = []
         agregated_nonces = []
         for key in sign_subset:
 
             single_sign, remove_data = key.sign(
-                commitments_data, msg, saved_data['private_data'][key.node_id]['nonces'])
+                nonces_data, msg, saved_data['private_data'][key.node_id]['nonces'])
 
-            self.assertTrue(pyfrost.verify_single_signature(int(key.node_id), msg, commitments_data, Utils.code_to_pub(single_sign['aggregated_public_nonce']), Utils.pub_to_code(crypto.get_public_key(key.dkg_key_pair['share'], Utils.ecurve)), single_sign, Utils.pub_to_code(key.dkg_key_pair['dkg_public_key'])),
+            self.assertTrue(pyfrost.verify_single_signature(int(key.node_id), msg, nonces_data, Utils.code_to_pub(single_sign['aggregated_public_nonce']), Utils.pub_to_code(crypto.get_public_key(key.dkg_key_pair['share'], Utils.ecurve)), single_sign, Utils.pub_to_code(key.dkg_key_pair['dkg_public_key'])),
                             f"SINGLE SIGNATURE FAILED BY NODE {key.node_id}"
                             )
 

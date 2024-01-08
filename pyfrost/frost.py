@@ -234,12 +234,12 @@ class Key:
             self.dkg_key_pair['dkg_public_key'])
         self.node_id = node_id
 
-    def sign(self, commitments_dict: Dict, message: str, nonces: List[Dict]) -> Tuple[Dict, Dict]:
+    def sign(self, nonces_dict: Dict, message: str, nonces: List[Dict]) -> Tuple[Dict, Dict]:
         assert isinstance(message, str), 'Message should be of string type.'
 
         nonce_d, nonce_e = 0, 0
         signature, used_nonce = None, None
-        my_nonce = commitments_dict[self.node_id]
+        my_nonce = nonces_dict[self.node_id]
 
         for pair in nonces:
             nonce_d = pair['nonce_d_pair'].get(my_nonce['public_nonce_d'])
@@ -252,7 +252,7 @@ class Key:
                     nonce_d,
                     nonce_e,
                     message,
-                    commitments_dict,
+                    nonces_dict,
                     pub_to_code(self.dkg_key_pair['dkg_public_key'])
                 )
                 used_nonce = {
@@ -265,54 +265,54 @@ class Key:
 
 
 def single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,
-                      commitments_dict: Dict[str, Dict[str, int]], group_key: Point) -> Dict[str, int]:
-        # Prepare hashes and list
-        commitments_list = list(commitments_dict.values())
-        commitments_hash = Web3.keccak(text=json.dumps(commitments_list))
-        message_bytes = message.encode('utf-8')
+                nonces_dict: Dict[str, Dict[str, int]], group_key: Point) -> Dict[str, int]:
+    # Prepare bytes and list
+    message_bytes = message.encode('utf-8')
+    nonces_list = list(nonces_dict.values())
+    nonces_hash = Web3.keccak(text=json.dumps(nonces_list))
 
-        # Aggregate public nonces and find the relevant row and index
-        aggregated_public_nonce = None
-        my_row, index = 0, 0
-        for idx, commitment in enumerate(commitments_list):
-            # Convert codes to public nonces and validate
-            nonce_d_public = code_to_pub(commitment['public_nonce_d'])
-            nonce_e_public = code_to_pub(commitment['public_nonce_e'])
-            for nonce_public, nonce_name in [(nonce_d_public, 'D'), (nonce_e_public, 'E')]:
-                assert ecurve.is_point_on_curve((nonce_public.x, nonce_public.y)), \
-                    f'Nonce {nonce_name} from Node {commitment["id"]} Not on Curve'
+    # Aggregate public nonces and find the relevant row and index
+    aggregated_public_nonce = None
+    my_row, index = 0, 0
+    for idx, nonce in enumerate(nonces_list):
+        # Convert codes to public nonces and validate
+        nonce_d_public = code_to_pub(nonce['public_nonce_d'])
+        nonce_e_public = code_to_pub(nonce['public_nonce_e'])
+        for nonce_public, nonce_name in [(nonce_d_public, 'D'), (nonce_e_public, 'E')]:
+            assert ecurve.is_point_on_curve((nonce_public.x, nonce_public.y)), \
+                f'Nonce {nonce_name} from Node {nonce["id"]} Not on Curve'
 
-            # Compute public nonce
-            row = Web3.solidity_keccak(['string', 'bytes', 'bytes'],
-                                       [hex(commitment['id']), message_bytes, commitments_hash])
-            public_nonce = nonce_d_public + \
-                (int.from_bytes(row, 'big') * nonce_e_public)
-            aggregated_public_nonce = public_nonce if aggregated_public_nonce is None else aggregated_public_nonce + public_nonce
+        # Compute public nonce
+        row = Web3.solidity_keccak(['string', 'bytes', 'bytes'],
+                                   [hex(nonce['id']), message_bytes, nonces_hash])
+        public_nonce = nonce_d_public + \
+            (int.from_bytes(row, 'big') * nonce_e_public)
+        aggregated_public_nonce = public_nonce if aggregated_public_nonce is None else aggregated_public_nonce + public_nonce
 
-            # Check for the current party's commitment
-            if id == commitment['id']:
-                my_row, index = row, idx
+        # Check for the current party's nonce
+        if id == nonce['id']:
+            my_row, index = row, idx
 
-        # Calculate challenge
-        group_key_pub = pub_compress(code_to_pub(group_key))
-        challenge = Web3.solidity_keccak(
-            ['uint256', 'uint8', 'uint256', 'address'],
-            [Web3.to_int(hexstr=group_key_pub['x']), group_key_pub['y_parity'],
-             Web3.to_int(message_bytes), pub_to_addr(aggregated_public_nonce)]
-        )
+    # Calculate challenge
+    group_key_pub = pub_compress(code_to_pub(group_key))
+    challenge = Web3.solidity_keccak(
+        ['uint256', 'uint8', 'uint256', 'address'],
+        [Web3.to_int(hexstr=group_key_pub['x']), group_key_pub['y_parity'],
+         Web3.to_int(message_bytes), pub_to_addr(aggregated_public_nonce)]
+    )
 
-        # Calculate signature share
-        coef = langrange_coef(index, len(
-            commitments_list), commitments_list, 0)
-        signature_share = (nonce_d + nonce_e * int.from_bytes(my_row, 'big') -
-                           coef * share * int.from_bytes(challenge, 'big')) % N
+    # Calculate signature share
+    coef = langrange_coef(index, len(
+        nonces_list), nonces_list, 0)
+    signature_share = (nonce_d + nonce_e * int.from_bytes(my_row, 'big') -
+                       coef * share * int.from_bytes(challenge, 'big')) % N
 
-        return {
-            'id': id,
-            'signature': signature_share,
-            'public_key': pub_to_code(keys.get_public_key(share, ecurve)),
-            'aggregated_public_nonce': pub_to_code(aggregated_public_nonce)
-        }
+    return {
+        'id': id,
+        'signature': signature_share,
+        'public_key': pub_to_code(keys.get_public_key(share, ecurve)),
+        'aggregated_public_nonce': pub_to_code(aggregated_public_nonce)
+    }
 
 
 def create_nonces(node_id: int, number_of_nonces: int = 10) -> Tuple[List[Dict], List[Dict]]:
@@ -340,21 +340,21 @@ def create_nonces(node_id: int, number_of_nonces: int = 10) -> Tuple[List[Dict],
     return nonce_publics, nonce_privates
 
 
-def verify_single_signature(id: int, message: str, commitments_dict: Dict[str, Dict[str, int]], aggregated_public_nonce: Point,
+def verify_single_signature(id: int, message: str, nonces_dict: Dict[str, Dict[str, int]], aggregated_public_nonce: Point,
                             public_key_share: int, single_signature: Dict[str, int], group_key: Point) -> bool:
     # Prepare hashes and list
-    commitments_list = list(commitments_dict.values())
-    commitments_hash = Web3.keccak(text=json.dumps(commitments_list))
+    nonces_list = list(nonces_dict.values())
+    nonces_hash = Web3.keccak(text=json.dumps(nonces_list))
     message_bytes = message.encode('utf-8')
 
-    # Find the relevant commitment and calculate the public nonce
+    # Find the relevant nonce and calculate the public nonce
     public_nonce, index = None, 0
-    for idx, commitment in enumerate(commitments_list):
-        if commitment['id'] == id:
-            nonce_d_public = code_to_pub(commitment['public_nonce_d'])
-            nonce_e_public = code_to_pub(commitment['public_nonce_e'])
+    for idx, nonce in enumerate(nonces_list):
+        if nonce['id'] == id:
+            nonce_d_public = code_to_pub(nonce['public_nonce_d'])
+            nonce_e_public = code_to_pub(nonce['public_nonce_e'])
             row = Web3.solidity_keccak(['string', 'bytes', 'bytes'],
-                                       [hex(commitment['id']), message_bytes, commitments_hash])
+                                       [hex(nonce['id']), message_bytes, nonces_hash])
             public_nonce = nonce_d_public + \
                 (int.from_bytes(row, 'big') * nonce_e_public)
             index = idx
@@ -369,7 +369,7 @@ def verify_single_signature(id: int, message: str, commitments_dict: Dict[str, D
     )
 
     # Calculate coefficients and points
-    coef = langrange_coef(index, len(commitments_list), commitments_list, 0)
+    coef = langrange_coef(index, len(nonces_list), nonces_list, 0)
     point1 = public_nonce - \
         (int.from_bytes(challenge, 'big') * coef * code_to_pub(public_key_share))
     point2 = single_signature['signature'] * ecurve.G
@@ -378,24 +378,24 @@ def verify_single_signature(id: int, message: str, commitments_dict: Dict[str, D
     return point1 == point2
 
 
-def aggregate_nonce(message: str, commitments_dict: Dict[str, Dict[str, int]], group_key: Point):
-    # Convert commitments to a list and calculate hashes
-    commitments_list = list(commitments_dict.values())
-    commitments_hash = Web3.keccak(text=json.dumps(commitments_list))
+def aggregate_nonce(message: str, nonces_dict: Dict[str, Dict[str, int]], group_key: Point):
+    # Convert nonces to a list and calculate hashes
+    nonces_list = list(nonces_dict.values())
+    nonces_hash = Web3.keccak(text=json.dumps(nonces_list))
     message_bytes = message.encode('utf-8')
 
     # Initialize aggregated public nonce
     aggregated_public_nonce = None
 
-    for commitment in commitments_list:
+    for nonce in nonces_list:
         # Convert codes to public nonces
-        nonce_d_public = code_to_pub(commitment['public_nonce_d'])
-        nonce_e_public = code_to_pub(commitment['public_nonce_e'])
+        nonce_d_public = code_to_pub(nonce['public_nonce_d'])
+        nonce_e_public = code_to_pub(nonce['public_nonce_e'])
 
         # Calculate row hash
         row_hash = Web3.solidity_keccak(
             ['string', 'bytes', 'bytes'],
-            [hex(commitment['id']), message_bytes, commitments_hash]
+            [hex(nonce['id']), message_bytes, nonces_hash]
         )
 
         # Calculate public nonce
@@ -414,7 +414,7 @@ def aggregate_nonce(message: str, commitments_dict: Dict[str, Dict[str, int]], g
 def aggregate_signatures(message: str, single_signatures: List[Dict[str, int]], aggregated_public_nonce: Point, group_key: int) -> Dict:
     # Calculate message bytes
     message_bytes = message.encode('utf-8')
-    
+
     # Aggregate signatures
     aggregated_signature = sum(sign['signature']
                                for sign in single_signatures) % N
@@ -462,8 +462,8 @@ def __create_complaint(node_id: str, secret_key: int, partner_id: str, partner_p
     # Generate keypair
     random_nonce, public_nonce = keys.gen_keypair()
 
-    # Calculate commitment
-    commitment = random_nonce * partner_public
+    # Calculate nonce
+    nonce = random_nonce * partner_public
 
     # Create the hash for the Proof of Complaint (PoC)
     complaint_pop_hash = Web3.solidity_keccak(
@@ -479,7 +479,7 @@ def __create_complaint(node_id: str, secret_key: int, partner_id: str, partner_p
             pub_to_code(partner_public),
             encryption_joint_key,
             pub_to_code(public_nonce),
-            pub_to_code(commitment)
+            pub_to_code(nonce)
         ]
     )
 
@@ -493,7 +493,7 @@ def __create_complaint(node_id: str, secret_key: int, partner_id: str, partner_p
     # Assemble the Proof of Complaint
     complaint_pop = {
         'public_nonce': pub_to_code(public_nonce),
-        'commitment': pub_to_code(commitment),
+        'nonce': pub_to_code(nonce),
         'signature': complaint_pop_sign
     }
 

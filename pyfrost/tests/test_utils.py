@@ -131,14 +131,14 @@ class Test(unittest.TestCase):
             nodes_subset = []
             for k in key_shares_subset:
                 nodes_subset.append(k['id'])
-            commitments_dict = {}
+            nonces_dict = {}
             private_nonces = []
             for id in nodes_subset:
                 nonce_d, public_nonce_d = keys.gen_keypair(Utils.ecurve)
                 nonce_e, public_nonce_e = keys.gen_keypair(Utils.ecurve)
                 private_nonces.append(
                     {'id': int(id), 'public_nonce_d': nonce_d, 'public_nonce_e': nonce_e})
-                commitments_dict[id] = {
+                nonces_dict[id] = {
                     'id': int(id),
                     'public_nonce_d': Utils.pub_to_code(public_nonce_d),
                     'public_nonce_e': Utils.pub_to_code(public_nonce_e)
@@ -155,14 +155,14 @@ class Test(unittest.TestCase):
                         nonce_d = nonce['public_nonce_d']
                         nonce_e = nonce['public_nonce_e']
                 single_signature = frost.single_sign(
-                    id, share, nonce_d, nonce_e, message, commitments_dict, group_key)
+                    id, share, nonce_d, nonce_e, message, nonces_dict, group_key)
                 share_public_keys[id] = Utils.pub_to_code(
                     keys.get_public_key(share, Utils.ecurve))
                 signatures.append(single_signature)
             group_nonce = frost.aggregate_nonce(
-                message, commitments_dict, group_key)
+                message, nonces_dict, group_key)
             for single_signature in signatures:
-                self.assertTrue(frost.verify_single_signature(single_signature['id'], message, commitments_dict, group_nonce, share_public_keys[single_signature['id']], single_signature, group_key),
+                self.assertTrue(frost.verify_single_signature(single_signature['id'], message, nonces_dict, group_nonce, share_public_keys[single_signature['id']], single_signature, group_key),
                                 f"FROST logic failed to verify single signature by node : {single_signature['id']}")
 
             group_sign = frost.aggregate_signatures(

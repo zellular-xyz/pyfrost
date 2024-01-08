@@ -266,14 +266,14 @@ def complaint_sign(private_key: int, nonce: int, hash: int):
 
 def complaint_verify(public_complaintant: Point, public_malicious: Point, encryption_key: Point, proof, hash: int):
     public_nonce = proof['public_nonce']
-    public_commitment = proof['commitment']
+    public_nonce = proof['nonce']
     signature = proof['signature']
 
     point1 = public_nonce + (hash * public_complaintant)
     point2 = signature * ecurve.G
     verification1 = (point1 == point2)
 
-    point1 = public_commitment + (hash * encryption_key)
+    point1 = public_nonce + (hash * encryption_key)
     point2 = signature * public_malicious
     verification2 = (point1 == point2)
 
