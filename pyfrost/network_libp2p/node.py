@@ -59,7 +59,7 @@ class Node(Libp2pBase):
         node_id = self.nodes_info.lookup_node(
             self.peer_id.to_base58())[1]
         self.key_gens[dkg_id] = KeyGen(
-            dkg_id, threshold, len(party), node_id, partners)
+            dkg_id, threshold, node_id, partners)
 
     def remove_key(self, dkg_id: str) -> None:
         if self.key_gens.get(dkg_id) is not None:

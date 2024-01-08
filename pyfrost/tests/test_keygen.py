@@ -27,7 +27,7 @@ class TestCaseKey(unittest.TestCase):
         for node_id in PARTY:
             partners = PARTY.copy()
             partners.remove(node_id)
-            keys.append(KeyGen(DKG_ID, T, N, node_id, partners, COEF0))
+            keys.append(KeyGen(DKG_ID, T, node_id, partners, COEF0))
 
         round1_received_data = []
         for key in keys:

@@ -79,7 +79,7 @@ class Node:
         partners = [
             node_id for node_id in party if self.node_id != node_id]
         self.key_gens[dkg_id] = KeyGen(
-            dkg_id, threshold, len(party), self.node_id, partners)
+            dkg_id, threshold, self.node_id, partners)
 
         round1_broadcast_data = self.key_gens[dkg_id].round1()
 

@@ -7,9 +7,8 @@ from fastecdsa.point import Point
 
 
 class KeyGen:
-    def __init__(self, dkg_id: str, threshold: int, n: int, node_id: str, partners: List[str], coefficient0: str = None) -> None:
+    def __init__(self, dkg_id: str, threshold: int, node_id: str, partners: List[str], coefficient0: str = None) -> None:
         self.threshold: int = threshold
-        self.n: int = n
         self.dkg_id: str = dkg_id
         self.node_id: str = node_id
         self.partners: List[str] = partners
