@@ -2,7 +2,7 @@ from pyfrost.network_libp2p.sa import SA
 from pyfrost.network_libp2p.dkg import Dkg
 from config import PEER_INFO, PRIVATE
 from typing import Dict
-from abstracts import NodeInfo
+from abstracts import NodesInfo
 import logging
 import time
 import timeit
@@ -13,14 +13,15 @@ import random
 
 
 async def run(total_node_number: int, threshold: int, n: int, num_signs: int) -> None:
-    node_info = NodeInfo()
+    nodes_info = NodesInfo()
 
-    all_nodes = node_info.get_all_nodes(total_node_number)
+    all_nodes = nodes_info.get_all_nodes(total_node_number)
     selected_nodes = {}
     for node_id, peer_ids in all_nodes.items():
         selected_nodes[node_id] = peer_ids[0]
-    dkg = Dkg(PEER_INFO, PRIVATE, node_info, max_workers=0, default_timeout=50)
-    sa = SA(PEER_INFO, PRIVATE, node_info, max_workers=0,
+    dkg = Dkg(PEER_INFO, PRIVATE, nodes_info,
+              max_workers=0, default_timeout=50)
+    sa = SA(PEER_INFO, PRIVATE, nodes_info, max_workers=0,
             default_timeout=50, host=dkg.host)
     nonces = {}
     async with trio.open_nursery() as nursery:
@@ -28,23 +29,22 @@ async def run(total_node_number: int, threshold: int, n: int, num_signs: int) ->
         # Run libp2p instance
         nursery.start_soon(dkg.run)
 
-
         # Request nonces
         nonces_response = await sa.request_nonces(selected_nodes)
         for node_id, peer_id in selected_nodes.items():
             nonces.setdefault(node_id, [])
             nonces[node_id] += nonces_response[peer_id]['nonces']
-            
+
         # Random party selection:
         seed = int(time.time())
         random.seed(seed)
         items = list(selected_nodes.items())
         random_subset = random.sample(items, n)
         party = dict(random_subset)
-        
+
         # Requesting DKG:
         now = timeit.default_timer()
-        dkg_key = await dkg.request_dkg(threshold, party, node_info)
+        dkg_key = await dkg.request_dkg(threshold, party)
         then = timeit.default_timer()
 
         logging.info(f'Requesting DKG takes: {then - now} seconds.')

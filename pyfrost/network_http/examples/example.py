@@ -1,7 +1,7 @@
 from pyfrost.network_http.sa import SA
 from pyfrost.network_http.dkg import Dkg
 from typing import Dict, List
-from abstracts import NodeInfo
+from abstracts import NodesInfo
 import logging
 import time
 import timeit
@@ -9,17 +9,19 @@ import sys
 import os
 import random
 import asyncio
+# TODO: Merge examples with libp2p.
+
 
 async def run_sample(total_node_number: int, threshold: int, n: int, num_signs: int) -> None:
-    node_info = NodeInfo()
-    all_nodes = node_info.get_all_nodes(total_node_number)
-    dkg = Dkg(node_info, default_timeout=50)
-    sa = SA(node_info, default_timeout=50)
+    nodes_info = NodesInfo()
+    all_nodes = nodes_info.get_all_nodes(total_node_number)
+    dkg = Dkg(nodes_info, default_timeout=50)
+    sa = SA(nodes_info, default_timeout=50)
     nonces = {}
     nonces_response = await sa.request_nonces(all_nodes)
     for node_id in all_nodes:
         nonces.setdefault(node_id, [])
-        nonces[node_id] += nonces_response[node_id]['nonces']
+        nonces[node_id] += nonces_response[node_id]['data']
 
     # Random party selection:
     seed = int(time.time())
@@ -34,12 +36,12 @@ async def run_sample(total_node_number: int, threshold: int, n: int, num_signs: 
     logging.info(f'Requesting DKG takes: {then - now} seconds.')
     logging.info(f'The DKG result is {dkg_key["result"]}')
 
-    dkg_id = dkg_key['dkg_id']
+    dkg_public_key = dkg_key['public_key']
     logging.info(f'dkg key: {dkg_key}')
 
     for i in range(num_signs):
         logging.info(
-            f'Get signature {i} with DKG id {dkg_id}')
+            f'Get signature {i} with DKG public key {dkg_public_key}')
 
         dkg_party: List = dkg_key['party']
         nonces_dict = {}
@@ -77,7 +79,7 @@ if __name__ == '__main__':
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(logging.DEBUG)
 
     sys.set_int_max_str_digits(0)
 
@@ -87,6 +89,7 @@ if __name__ == '__main__':
     num_signs = int(sys.argv[4])
 
     try:
-        asyncio.run(run_sample(total_node_number, dkg_threshold, num_parties, num_signs))
+        asyncio.run(run_sample(total_node_number,
+                    dkg_threshold, num_parties, num_signs))
     except KeyboardInterrupt:
         pass

@@ -33,11 +33,11 @@ PROTOCOLS_ID = {
 
 class RequestObject:
     def __init__(self, request_id: str, call_method: str, parameters: Dict,
-                 input_data: Dict = None) -> None:
+                 data: Dict = None) -> None:
         self.request_id: str = request_id
         self.call_method: str = call_method
         self.parameters: Dict = parameters
-        self.input_data = input_data
+        self.data = data
 
     def get(self):
         result = {
@@ -45,8 +45,8 @@ class RequestObject:
             'method': self.call_method,
             'parameters': self.parameters
         }
-        if self.input_data:
-            result['input_data'] = self.input_data
+        if self.data:
+            result['data'] = self.data
         return result
 
 
@@ -76,7 +76,7 @@ class Libp2pBase:
 
             self.host: IHost = BasicHost(swarm)
 
-        self.ip: str = address['ip']
+        self.ip: str = address['host']
         self.port: str = address['port']
 
         self.protocol_list: Dict[str, TProtocol] = {}
@@ -120,7 +120,7 @@ class Libp2pBase:
                      message: Dict, result: Dict = None, timeout: float = 5.0) -> None:
 
         now = timeit.default_timer()
-        destination = f'/ip4/{destination_address["ip"]}/tcp/{destination_address["port"]}/p2p/{destination_peer_id}'
+        destination = f'/ip4/{destination_address["host"]}/tcp/{destination_address["port"]}/p2p/{destination_peer_id}'
         logging.info(
             f'{destination_peer_id}{protocol_id} destination: {destination}')
         maddr = multiaddr.Multiaddr(destination)
@@ -139,7 +139,7 @@ class Libp2pBase:
                 encoded_message = json.dumps(message).encode('utf-8')
                 await stream.write(encoded_message)
                 logging.debug(
-                    f'{destination_peer_id}{protocol_id} Sent message: {encoded_message}')
+                    f'{destination_peer_id}{protocol_id} Sent message: {json.dumps(message, indent=4)}')
 
                 await stream.close()
                 logging.debug(
@@ -147,10 +147,10 @@ class Libp2pBase:
 
                 if result is not None:
                     response = await stream.read()
-                    logging.debug(
-                        f'{destination_peer_id}{protocol_id} Received response: {response}')
                     result[destination_peer_id] = json.loads(
                         response.decode('utf-8'))
+                    logging.debug(
+                        f'{destination_peer_id}{protocol_id} Received response: {json.dumps(result[destination_peer_id], indent=4)}')
                     then = timeit.default_timer()
                     logging.debug(
                         f'{destination_peer_id}{protocol_id} takes: {then - now} seconds.')

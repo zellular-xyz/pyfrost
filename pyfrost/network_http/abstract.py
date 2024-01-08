@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Any
 
 
 class DataManager(ABC):
@@ -20,7 +20,7 @@ class DataManager(ABC):
         pass
 
 
-class NodeInfo(ABC):
+class NodesInfo(ABC):
     @abstractmethod
     def lookup_node(self, node_id: str):
         pass
@@ -29,11 +29,13 @@ class NodeInfo(ABC):
     def get_all_nodes(self, n: int = None) -> Dict:
         pass
 
+# TODO: Use request object instead of method
+
 
 class Validators(ABC):
     @staticmethod
     @abstractmethod
-    def caller_validator(ip: str, method: str):
+    def caller_validator(ip: str, request: Any):
         pass
 
     @staticmethod

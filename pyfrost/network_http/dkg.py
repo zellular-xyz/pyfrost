@@ -1,35 +1,20 @@
 from typing import List, Dict
-from .abstract import NodeInfo
 from fastecdsa import ecdsa, curve
 from pyfrost.crypto_utils import code_to_pub
+from .abstract import NodesInfo
+from .sa import post_request
 import logging
 import json
 import uuid
-import aiohttp
 import asyncio
 
-
-async def post_request(url: str, data: Dict, timeout: int = 10):
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=data, timeout=timeout) as response:
-            try:
-                return await response.json()
-            except asyncio.TimeoutError:
-                return {
-                    'status': 'TIMEOUT',
-                    'error': 'Communication timed out',
-                }
-            except Exception as e:
-                return {
-                    'status': 'ERROR',
-                    'error': f'An exception occurred: {type(e).__name__}: {e}',
-                }
+# TODO: remove code_to_pub
 
 
 class Dkg:
-    def __init__(self, node_info: NodeInfo, default_timeout: int = 200) -> None:
+    def __init__(self, nodes_info: NodesInfo, default_timeout: int = 200) -> None:
 
-        self.node_info: NodeInfo = node_info
+        self.nodes_info: NodesInfo = nodes_info
         self.default_timeout = default_timeout
 
     def __gather_round2_data(self, node_id: str, data: Dict) -> List:
@@ -61,8 +46,9 @@ class Dkg:
             'dkg_id': dkg_id,
             'threshold': threshold,
         }
-        urls = [self.node_info.lookup_node(
-            node_id)['http'] + call_method for node_id in party]
+        node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
+        urls = [f'http://{node["host"]}:{node["port"]}' +
+                call_method for node in node_info]
         request_tasks = [post_request(
             url, request_data, self.default_timeout) for url in urls]
         responses = await asyncio.gather(*request_tasks)
@@ -85,11 +71,12 @@ class Dkg:
 
         # TODO: error handling (if verification failed)
         for node_id, data in round1_response.items():
-            data_bytes = json.dumps(data['broadcast'], sort_keys=True).encode('utf-8')
-            validation = data['validation']
-            public_key = self.node_info.lookup_node(node_id)['public_key']
+            data_bytes = json.dumps(
+                data['broadcast'], sort_keys=True).encode('utf-8')
+            signature = data['validation']
+            public_key = self.nodes_info.lookup_node(node_id)['public_key']
             verify_result = ecdsa.verify(
-                validation, data_bytes, code_to_pub(public_key), curve=curve.secp256k1)
+                signature, data_bytes, code_to_pub(public_key), curve=curve.secp256k1)
             logging.debug(
                 f'Verification of sent data from {node_id}: {verify_result}')
 
@@ -98,8 +85,9 @@ class Dkg:
             'dkg_id': dkg_id,
             'broadcasted_data': round1_response
         }
-        urls = [self.node_info.lookup_node(
-            node_id)['http'] + call_method for node_id in party]
+        node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
+        urls = [f'http://{node["host"]}:{node["port"]}' +
+                call_method for node in node_info]
         request_tasks = [post_request(
             url, request_data, self.default_timeout) for url in urls]
         responses = await asyncio.gather(*request_tasks)
@@ -117,7 +105,8 @@ class Dkg:
                 'call_method': call_method,
                 'response': round2_response,
             }
-            logging.info(f'DKG request result: {response}')
+            logging.info(
+                f'DKG request result: {json.dumps(response, indent=4)}')
             return response
 
         call_method = '/v1/dkg/round3'
@@ -127,8 +116,10 @@ class Dkg:
                 'dkg_id': dkg_id,
                 'send_data': self.__gather_round2_data(node_id, round2_response)
             }
-            url = self.node_info.lookup_node(node_id)['http'] + call_method
-            request_tasks.append(post_request(url, request_data, self.default_timeout))
+            node_info = self.nodes_info.lookup_node(node_id)
+            url = f'http://{node_info["host"]}:{node_info["port"]}' + call_method
+            request_tasks.append(post_request(
+                url, request_data, self.default_timeout))
         responses = await asyncio.gather(*request_tasks)
         round3_response = dict(zip(party, responses))
 
@@ -140,7 +131,6 @@ class Dkg:
                 continue
             response = {
                 'result': 'FAILED',
-                'dkg_id': dkg_id,
                 'call_method': call_method,
                 'round1_response': round1_response,
                 'round2_response': round2_response,
@@ -164,7 +154,6 @@ class Dkg:
             validations[id] = data['validation']
 
         response = {
-            'dkg_id': dkg_id,
             'public_key': public_key,
             'public_shares': public_shares,
             'party': party,

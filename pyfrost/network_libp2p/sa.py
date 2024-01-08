@@ -3,7 +3,7 @@ from libp2p.peer.id import ID as PeerID
 from libp2p.typing import TProtocol
 from typing import Dict
 from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
-from .abstract import NodeInfo
+from .abstract import NodesInfo
 import pyfrost
 import types
 import json
@@ -14,11 +14,11 @@ import uuid
 
 class SA(Libp2pBase):
 
-    def __init__(self, address: Dict[str, str], secret: str, node_info: NodeInfo,
+    def __init__(self, address: Dict[str, str], secret: str, nodes_info: NodesInfo,
                  max_workers: int = 0, default_timeout: int = 50, host: IHost = None) -> None:
 
         super().__init__(address, secret, host)
-        self.node_info: NodeInfo = node_info
+        self.nodes_info: NodesInfo = nodes_info
         self.token = ''
         if max_workers != 0:
             self.semaphore = trio.Semaphore(max_workers)
@@ -30,13 +30,13 @@ class SA(Libp2pBase):
         call_method = 'generate_nonces'
         req_id = str(uuid.uuid4())
         parameters = {
-            'number_of_nonces': number_of_nonces * 10,
+            'number_of_nonces': number_of_nonces,
         }
         request_object = RequestObject(req_id, call_method, parameters)
         nonces_response = {}
         async with trio.open_nursery() as nursery:
             for node_id, peer_id in party.items():
-                destination_address = self.node_info.lookup_node(peer_id, node_id)[
+                destination_address = self.nodes_info.lookup_node(peer_id, node_id)[
                     0]
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), nonces_response, self.default_timeout, self.semaphore)
@@ -45,9 +45,10 @@ class SA(Libp2pBase):
         return nonces_response
 
     async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
-                                input_data: Dict, sign_party: Dict) -> Dict:
+                                sa_data: Dict, sign_party: Dict) -> Dict:
         call_method = 'sign'
-        dkg_id = dkg_key['dkg_id']
+        dkg_public_key = dkg_key['public_key']
+        request_id = str(uuid.uuid4())
         if not set(sign_party).issubset(set(dkg_key['party'])):
             response = {
                 'result': 'FAILED',
@@ -56,16 +57,16 @@ class SA(Libp2pBase):
             return response
 
         parameters = {
-            'dkg_id': dkg_id,
+            'dkg_public_key': dkg_public_key,
             'nonces_list': nonces_list,
         }
         request_object = RequestObject(
-            dkg_id, call_method, parameters, input_data)
+            request_id, call_method, parameters, sa_data)
 
         signatures = {}
         async with trio.open_nursery() as nursery:
             for peer_id in sign_party.values():
-                destination_address = self.node_info.lookup_node(peer_id)[0]
+                destination_address = self.nodes_info.lookup_node(peer_id)[0]
                 nursery.start_soon(Wrappers.sign, self.send, dkg_key, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), signatures, self.default_timeout, self.semaphore)
         logging.debug(

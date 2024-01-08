@@ -21,7 +21,7 @@ class DataManager(ABC):
         pass
 
 
-class NodeInfo(ABC):
+class NodesInfo(ABC):
     @abstractmethod
     def lookup_node(self, peer_id: str, node_id: str = None):
         pass

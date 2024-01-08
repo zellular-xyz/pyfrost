@@ -1,5 +1,5 @@
 from typing import List, Dict
-from .abstract import NodeInfo
+from .abstract import NodesInfo
 import pyfrost
 import logging
 import json
@@ -26,9 +26,9 @@ async def post_request(url: str, data: Dict, timeout: int = 10):
 
 
 class SA:
-    def __init__(self, node_info: NodeInfo, default_timeout: int = 200) -> None:
+    def __init__(self, nodes_info: NodesInfo, default_timeout: int = 200) -> None:
 
-        self.node_info: NodeInfo = node_info
+        self.nodes_info: NodesInfo = nodes_info
         self.default_timeout = default_timeout
 
     async def request_nonces(self, party: List, number_of_nonces: int = 10):
@@ -36,8 +36,9 @@ class SA:
         request_data = {
             'number_of_nonces': number_of_nonces,
         }
-        urls = [self.node_info.lookup_node(
-            node_id)['http'] + call_method for node_id in party]
+        node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
+        urls = [f'http://{node["host"]}:{node["port"]}' +
+                call_method for node in node_info]
         request_tasks = [post_request(
             url, request_data, self.default_timeout) for url in urls]
         responses = await asyncio.gather(*request_tasks)
@@ -50,21 +51,23 @@ class SA:
     async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
                                 sa_data: Dict, sign_party: List) -> Dict:
         call_method = '/v1/sign'
-        dkg_id = dkg_key['dkg_id']
         if not set(sign_party).issubset(set(dkg_key['party'])):
             response = {
                 'result': 'FAILED',
                 'signatures': None
             }
             return response
-
+        request_id = str(uuid.uuid4())
         request_data = {
-            'dkg_id': dkg_id,
+            'request_id': request_id,
+            'dkg_public_key': dkg_key['public_key'],
             'nonces_list': nonces_list,
             'data': sa_data
         }
-        urls = [self.node_info.lookup_node(
-            node_id)['http'] + call_method for node_id in sign_party]
+        node_info = [self.nodes_info.lookup_node(
+            node_id) for node_id in sign_party]
+        urls = [f'http://{node["host"]}:{node["port"]}' +
+                call_method for node in node_info]
         request_tasks = [post_request(
             url, request_data, self.default_timeout) for url in urls]
         responses = await asyncio.gather(*request_tasks)
@@ -124,7 +127,7 @@ class SA:
             aggregated_sign['message_hash'] = aggregated_sign['message_hash'].hex()
             aggregated_sign['result'] = 'SUCCESSFUL'
             aggregated_sign['signature_data'] = sample_result
-            aggregated_sign['request_id'] = dkg_id
+            aggregated_sign['request_id'] = request_id
             logging.info(
                 f'Aggregated sign result: {aggregated_sign["result"]}')
         else:

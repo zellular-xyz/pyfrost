@@ -1,5 +1,5 @@
 from .libp2p_base import Libp2pBase, PROTOCOLS_ID
-from .abstract import NodeInfo, DataManager
+from .abstract import NodesInfo, DataManager
 from pyfrost.frost import Key, KeyGen
 from pyfrost import create_nonces
 from libp2p.network.stream.net_stream_interface import INetStream
@@ -23,17 +23,17 @@ def auth_decorator(handler):
                 # TODO: raise exception and handle it.
         except json.JSONDecodeError:
             logging.error(
-                    'Node Decorator => Error. Unauthorized SA.')
+                'Node Decorator => Error. Unauthorized SA.')
             # TODO: raise exception and handle it.
     return wrapper
 
 
 class Node(Libp2pBase):
     def __init__(self, data_manager: DataManager, address: Dict[str, str],
-                 secret: str, node_info: NodeInfo, caller_validator: types.FunctionType,
+                 secret: str, nodes_info: NodesInfo, caller_validator: types.FunctionType,
                  data_validator: types.FunctionType) -> None:
         super().__init__(address, secret)
-        self.node_info: NodeInfo = node_info
+        self.nodes_info: NodesInfo = nodes_info
         self.key_gens: Dict[str, KeyGen] = {}
         self.caller_validator = caller_validator
         self.data_validator = data_validator
@@ -56,7 +56,7 @@ class Node(Libp2pBase):
 
         partners = [str(node_id)
                     for node_id in party if self.peer_id.to_base58() not in party[node_id]]
-        node_id = self.node_info.lookup_node(
+        node_id = self.nodes_info.lookup_node(
             self.peer_id.to_base58())[1]
         self.key_gens[dkg_id] = KeyGen(
             dkg_id, threshold, len(party), node_id, partners)
@@ -78,7 +78,7 @@ class Node(Libp2pBase):
         dkg_id = parameters['dkg_id']
 
         logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["round1"]} Got message: {message}')
+            f'{sender_id}{PROTOCOLS_ID["round1"]} Got message: {json.dumps(data, indent=4)}')
 
         self.add_new_key(
             dkg_id,
@@ -88,6 +88,7 @@ class Node(Libp2pBase):
 
         round1_broadcast_data = self.key_gens[dkg_id].round1()
         broadcast_bytes = json.dumps(round1_broadcast_data).encode('utf-8')
+        # TODO: check sign necessity of the round1
         data = {
             'broadcast': round1_broadcast_data,
             'validation': self._key_pair.private_key.sign(broadcast_bytes).hex(),
@@ -97,7 +98,7 @@ class Node(Libp2pBase):
         try:
             await stream.write(response)
             logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["round1"]} Sent message: {response.decode()}')
+                f'{sender_id}{PROTOCOLS_ID["round1"]} Sent message: {json.dumps(data, indent=4)}')
         except Exception as e:
             logging.error(
                 f'Node => Exception occurred: {type(e).__name__}: {e}')
@@ -117,7 +118,7 @@ class Node(Libp2pBase):
         whole_broadcasted_data = parameters['broadcasted_data']
 
         logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["round2"]} Got message: {message}')
+            f'{sender_id}{PROTOCOLS_ID["round2"]} Got message: {json.dumps(data, indent=4)}')
 
         broadcasted_data = []
         for peer_id, data in whole_broadcasted_data.items():
@@ -125,7 +126,7 @@ class Node(Libp2pBase):
             data_bytes = json.dumps(data['broadcast']).encode('utf-8')
             validation = bytes.fromhex(data['validation'])
             public_key_bytes = bytes.fromhex(
-                self.node_info.lookup_node(peer_id)[0]['public_key'])
+                self.nodes_info.lookup_node(peer_id)[0]['public_key'])
             public_key = Secp256k1PublicKey.deserialize(public_key_bytes)
             broadcasted_data.append(data['broadcast'])
             logging.debug(
@@ -140,7 +141,7 @@ class Node(Libp2pBase):
         try:
             await stream.write(response)
             logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["round2"]} Sent message: {response.decode()}')
+                f'{sender_id}{PROTOCOLS_ID["round2"]} Sent message: {json.dumps(data, indent=4)}')
         except Exception as e:
             logging.error(
                 f'Node => Exception occurred: {type(e).__name__}: {e}')
@@ -160,7 +161,7 @@ class Node(Libp2pBase):
         send_data = parameters['send_data']
 
         logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["round3"]} Got message: {message}')
+            f'{sender_id}{PROTOCOLS_ID["round3"]} Got message: {json.dumps(data, indent=4)}')
         round3_data = self.key_gens[dkg_id].round3(send_data)
         if round3_data['status'] == 'COMPLAINT':
             self.remove_key(dkg_id)
@@ -172,7 +173,7 @@ class Node(Libp2pBase):
                 sign_data).hex()
 
             self.data_manager.set_key(
-                dkg_id, round3_data['dkg_key_pair'])
+                str(round3_data['dkg_key_pair']['dkg_public_key']), round3_data['dkg_key_pair'])
 
         data = {
             'data': round3_data['data'],
@@ -183,7 +184,7 @@ class Node(Libp2pBase):
         try:
             await stream.write(response)
             logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["round3"]} Sent message: {response.decode()}')
+                f'{sender_id}{PROTOCOLS_ID["round3"]} Sent message: {json.dumps(data, indent=4)}')
         except Exception as e:
             logging.error(
                 f'Node => Exception occurred: {type(e).__name__}: {e}')
@@ -201,8 +202,8 @@ class Node(Libp2pBase):
         number_of_nonces = parameters['number_of_nonces']
 
         logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["generate_nonces"]} Got message: {message}')
-        node_id = self.node_info.lookup_node(
+            f'{sender_id}{PROTOCOLS_ID["generate_nonces"]} Got message: {json.dumps(data, indent=4)}')
+        node_id = self.nodes_info.lookup_node(
             self.peer_id.to_base58())[1]
         nonces, save_data = create_nonces(
             int(node_id), number_of_nonces)
@@ -215,7 +216,7 @@ class Node(Libp2pBase):
         try:
             await stream.write(response)
             logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["generate_nonces"]} Sent message: {response.decode()}')
+                f'{sender_id}{PROTOCOLS_ID["generate_nonces"]} Sent message: {json.dumps(data, indent=4)}')
         except Exception as e:
             logging.error(
                 f'Node=> Exception occurred: {type(e).__name__}: {e}')
@@ -228,17 +229,17 @@ class Node(Libp2pBase):
         data = json.loads(message)
         sender_id = stream.muxed_conn.peer_id
         parameters = data['parameters']
-        dkg_id = parameters['dkg_id']
+        dkg_public_key = parameters['dkg_public_key']
         nonces_list = parameters['nonces_list']
-        input_data = data['input_data']
+        sa_data = data['data']
 
         logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["sign"]} Got message: {message}')
+            f'{sender_id}{PROTOCOLS_ID["sign"]} Got message: {json.dumps(message, indent=4)}')
         result = {}
         try:
-            result = self.data_validator(input_data)
-            key_pair = self.data_manager.get_key(dkg_id)
-            key = Key(key_pair, self.node_info.lookup_node(
+            result = self.data_validator(sa_data)
+            key_pair = self.data_manager.get_key(str(dkg_public_key))
+            key = Key(key_pair, self.nodes_info.lookup_node(
                 self.peer_id.to_base58())[1])
             nonces = self.data_manager.get_nonces()
             result['signature_data'], remove_data = key.sign(
@@ -261,7 +262,7 @@ class Node(Libp2pBase):
         try:
             await stream.write(response)
             logging.debug(
-                f'{sender_id}{PROTOCOLS_ID["sign"]} Sent message: {response.decode()}')
+                f'{sender_id}{PROTOCOLS_ID["sign"]} Sent message: {json.dumps(data, indent=4)}')
         except Exception as e:
             logging.error(
                 f'Node=> Exception occurred: {type(e).__name__}: {e}')

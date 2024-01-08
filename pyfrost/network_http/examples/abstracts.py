@@ -1,5 +1,5 @@
-from pyfrost.network_http.abstract import Validators, DataManager, NodeInfo as BaseNodeInfo
-from config import VALIDATED_IPS, generate_privates_and_node_info
+from pyfrost.network_http.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
+from config import VALIDATED_IPS, generate_privates_and_nodes_info
 from typing import Dict, List
 import hashlib
 import json
@@ -45,9 +45,9 @@ class NodeValidators(Validators):
         return result
 
 
-class NodeInfo(BaseNodeInfo):
+class NodesInfo(BaseNodeInfo):
     def __init__(self):
-        _, self.nodes = generate_privates_and_node_info()
+        _, self.nodes = generate_privates_and_nodes_info()
 
     def lookup_node(self, node_id: str = None):
         return self.nodes.get(node_id, {})

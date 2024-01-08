@@ -3,7 +3,7 @@ from libp2p.peer.id import ID as PeerID
 from libp2p.host.host_interface import IHost
 from typing import List, Dict
 
-from .abstract import NodeInfo
+from .abstract import NodesInfo
 from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
 
 import trio
@@ -13,12 +13,12 @@ import uuid
 
 
 class Dkg(Libp2pBase):
-    def __init__(self, address: Dict[str, str], secret: str, node_info: NodeInfo,
+    def __init__(self, address: Dict[str, str], secret: str, nodes_info: NodesInfo,
                  max_workers: int = 0, default_timeout: int = 200, host:  IHost = None) -> None:
 
         super().__init__(address, secret, host)
 
-        self.node_info: NodeInfo = node_info
+        self.nodes_info: NodesInfo = nodes_info
         if max_workers != 0:
             self.semaphore = trio.Semaphore(max_workers)
         else:
@@ -33,7 +33,7 @@ class Dkg(Libp2pBase):
                     round2_data.append(entry)
         return round2_data
 
-    async def request_dkg(self, threshold: int, party: Dict, node_info: NodeInfo) -> Dict:
+    async def request_dkg(self, threshold: int, party: Dict) -> Dict:
         logging.info(
             f'Requesting DKG with threshold: {threshold}, party: {party}')
         dkg_id = str(uuid.uuid4())
@@ -59,7 +59,8 @@ class Dkg(Libp2pBase):
         round1_response = {}
         async with trio.open_nursery() as nursery:
             for node_id, peer_id in party.items():
-                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
+                destination_address = self.nodes_info.lookup_node(peer_id, node_id)[
+                    0]
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), round1_response, self.default_timeout, self.semaphore)
 
@@ -81,7 +82,7 @@ class Dkg(Libp2pBase):
         for node_id, data in round1_response.items():
             data_bytes = json.dumps(data['broadcast']).encode('utf-8')
             validation = bytes.fromhex(data['validation'])
-            peer_info = self.node_info.lookup_node(node_id)[0]
+            peer_info = self.nodes_info.lookup_node(node_id)[0]
             public_key_bytes = bytes.fromhex(
                 peer_info['public_key'])
 
@@ -99,7 +100,8 @@ class Dkg(Libp2pBase):
         round2_response = {}
         async with trio.open_nursery() as nursery:
             for node_id, peer_id in party.items():
-                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
+                destination_address = self.nodes_info.lookup_node(peer_id, node_id)[
+                    0]
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), round2_response, self.default_timeout, self.semaphore)
 
@@ -130,7 +132,8 @@ class Dkg(Libp2pBase):
                 }
                 request_object = RequestObject(dkg_id, call_method, parameters)
 
-                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
+                destination_address = self.nodes_info.lookup_node(peer_id, node_id)[
+                    0]
                 nursery.start_soon(self.send, destination_address, peer_id,
                                    PROTOCOLS_ID[call_method], request_object.get(), round3_response, self.default_timeout, self.semaphore)
 
@@ -162,8 +165,10 @@ class Dkg(Libp2pBase):
         public_shares = {}
         validations = {}
         for id, data in round3_response.items():
-            public_shares[self.node_info.lookup_node(id)[1]] = data['data']['public_share']
-            validations[self.node_info.lookup_node(id)[1]] = data['validation']
+            public_shares[self.nodes_info.lookup_node(
+                id)[1]] = data['data']['public_share']
+            validations[self.nodes_info.lookup_node(
+                id)[1]] = data['validation']
 
         response = {
             'dkg_id': dkg_id,

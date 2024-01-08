@@ -1,6 +1,6 @@
-from pyfrost.network_libp2p.abstract import Validators, DataManager, NodeInfo as BaseNodeInfo
+from pyfrost.network_libp2p.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
 from libp2p.typing import TProtocol
-from config import VALIDATED_CALLERS , generate_secrets_and_node_info
+from config import VALIDATED_CALLERS, generate_secrets_and_nodes_info
 from itertools import islice
 from typing import Dict, List
 import hashlib
@@ -13,7 +13,7 @@ class NodeDataManager(DataManager):
         self.__dkg_keys = {}
         self.__nonces = []
 
-    def set_nonces(self, nonces_list = List) -> None:
+    def set_nonces(self, nonces_list=List) -> None:
         self.__nonces = nonces_list
 
     def get_nonces(self):
@@ -47,9 +47,10 @@ class NodeValidators(Validators):
         return result
 
 
-class NodeInfo(BaseNodeInfo):
+class NodesInfo(BaseNodeInfo):
     def __init__(self):
-        self.nodes, _ = generate_secrets_and_node_info()
+        self.nodes, _ = generate_secrets_and_nodes_info()
+
     def lookup_node(self, peer_id: str, node_id: str = None):
         if node_id is None:
             for node_id, data in self.nodes.items():

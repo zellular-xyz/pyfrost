@@ -1,6 +1,6 @@
 from pyfrost.network_libp2p.node import Node
-from abstracts import NodeInfo, NodeDataManager, NodeValidators
-from config import generate_secrets_and_node_info
+from abstracts import NodesInfo, NodeDataManager, NodeValidators
+from config import generate_secrets_and_nodes_info
 import os
 import logging
 import trio
@@ -9,10 +9,10 @@ import sys
 
 async def run_node(node_number: int) -> None:
     data_manager = NodeDataManager()
-    node_info = NodeInfo()
-    node_peer_id = node_info.get_all_nodes()[str(node_number+1)][0]
-    _, secrets = generate_secrets_and_node_info()
-    node = Node(data_manager, node_info.lookup_node(node_peer_id)[0], secrets[node_peer_id], node_info,
+    nodes_info = NodesInfo()
+    node_peer_id = nodes_info.get_all_nodes()[str(node_number)][0]
+    _, secrets = generate_secrets_and_nodes_info()
+    node = Node(data_manager, nodes_info.lookup_node(node_peer_id)[0], secrets[node_peer_id], nodes_info,
                 NodeValidators.caller_validator, NodeValidators.data_validator)
     await node.run()
 

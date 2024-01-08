@@ -7,7 +7,7 @@ import random
 # SA and Dkg configuration:
 PRIVATE = 'c915ec16580f7217e24e06cbff8a6b92ceea0cffae3ce74e8e797f57e0f3f66d'
 PEER_INFO = {
-    "ip": "0.0.0.0",
+    "host": "0.0.0.0",
     "port": "7000",
     'public_key': '080212210338fede176f44704dc4fdcdace7c35108a126d8b77ad33ee7af09c0e18d56376a'
 }
@@ -19,13 +19,13 @@ VALIDATED_CALLERS = {
 }
 
 
-def generate_secrets_and_node_info():
+def generate_secrets_and_nodes_info():
     first_secret = b'\x91\x82\xc5\xa1\xcaK\xf1\xf3\xa2"{!\x93%#\x91\xd1`k|\xa8\xa2\r\xc7\xb9.\xb2\xaa>\xf3}\xa3'
-    node_info_dict = {}
+    nodes_info_dict = {}
     secrets_dict = {}
     last_peer_id = ''
     for i in range(1, 100):
-        if len(node_info_dict) == 0:
+        if len(nodes_info_dict) == 0:
             row_hash = first_secret
         else:
             row_hash = secrets_dict[last_peer_id].encode()
@@ -36,12 +36,12 @@ def generate_secrets_and_node_info():
         key_pair = create_new_key_pair(new_secret)
         peer_id: PeerID = PeerID.from_pubkey(key_pair.public_key)
         last_peer_id = peer_id.to_base58()
-        node_info_dict[str(i)] = {
+        nodes_info_dict[str(i)] = {
             last_peer_id: {
                 'public_key': key_pair.public_key.serialize().hex(),
-                'ip': '127.0.0.1',
+                'host': '127.0.0.1',
                 'port': str(5000+i)
             }
         }
         secrets_dict[last_peer_id] = new_secret.hex()
-    return node_info_dict, secrets_dict
+    return nodes_info_dict, secrets_dict

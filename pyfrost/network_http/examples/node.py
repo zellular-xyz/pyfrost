@@ -1,6 +1,6 @@
 from pyfrost.network_http.node import Node
-from abstracts import NodeInfo, NodeDataManager, NodeValidators
-from config import generate_privates_and_node_info
+from abstracts import NodesInfo, NodeDataManager, NodeValidators
+from config import generate_privates_and_nodes_info
 import os
 import logging
 import sys
@@ -8,11 +8,12 @@ import sys
 
 def run_node(node_number: int) -> None:
     data_manager = NodeDataManager()
-    node_info = NodeInfo()
-    privates, _ = generate_privates_and_node_info()
-    node = Node(data_manager, str(node_number), privates[node_number-1], node_info,
+    nodes_info = NodesInfo()
+    privates, _ = generate_privates_and_nodes_info()
+    node = Node(data_manager, str(node_number), privates[node_number-1], nodes_info,
                 NodeValidators.caller_validator, NodeValidators.data_validator)
     node.run_app()
+
 
 if __name__ == '__main__':
 
@@ -31,9 +32,9 @@ if __name__ == '__main__':
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(logging.DEBUG)
     sys.set_int_max_str_digits(0)
-    
+
     try:
         run_node(node_number)
     except KeyboardInterrupt:
