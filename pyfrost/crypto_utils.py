@@ -131,7 +131,7 @@ def mod_inverse(number: int, modulus: int) -> int:
 
 def pub_to_addr(public_key: Point) -> str:
     pub_key_hex = str(hex(public_key.x))[
-        2:] + str(hex(public_key.y))[2:]
+        2:] + str(hex(public_key.y)).replace('0x', '')
     pub_hash = Web3.keccak(int(pub_key_hex, 16))
     return Web3.to_checksum_address('0x'+str(pub_hash.hex())[-40:])
 
@@ -206,8 +206,8 @@ def reconstruct_share(shares: List[Dict], threshold: int, x: int) -> int:
 
 def schnorr_hash(public_key: Point, message: int) -> str:
     address = pub_to_addr(public_key)
-    addressBuff = str(address)[2:]
-    msgBuff = str(hex(message))[2:]
+    addressBuff = str(address).replace('0x', '')
+    msgBuff = str(hex(message)).replace('0x', '')
     totalBuff = addressBuff + msgBuff
     return Web3.keccak(int(totalBuff, 16))
 
@@ -219,13 +219,13 @@ def schnorr_sign(shared_private_key: int, nounce_private: int, nounce_public: Po
 
 
 def stringify_signature(signature: Dict[str, int]) -> str:
-    S = f'{hex(signature["s"])[2:]:0>64}'
-    E = f'{hex(signature["e"])[2:]:0>64}'
+    S = f'{hex(signature["s"]).replace("0x", ""):0>64}'
+    E = f'{hex(signature["e"]).replace("0x", ""):0>64}'
     return '0x' + E + S
 
 
 def split_signature(string_signature: str) -> Dict[str, int]:
-    raw_bytes = string_signature[2:]
+    raw_bytes = string_signature.replace('0x', '')
     assert len(raw_bytes) == 128, 'Invalid schnorr signature string'
     e = '0x' + raw_bytes[0:64]
     s = '0x' + raw_bytes[64:]

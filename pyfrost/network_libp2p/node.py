@@ -234,7 +234,7 @@ class Node(Libp2pBase):
         sa_data = data['data']
 
         logging.debug(
-            f'{sender_id}{PROTOCOLS_ID["sign"]} Got message: {json.dumps(message, indent=4)}')
+            f'{sender_id}{PROTOCOLS_ID["sign"]} Got message: {json.dumps(data, indent=4)}')
         result = {}
         try:
             result = self.data_validator(sa_data)
