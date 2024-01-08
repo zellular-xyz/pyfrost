@@ -94,7 +94,7 @@ class SA(Libp2pBase):
         }
         if not len(set(aggregated_public_nonces)) == 1:
             aggregated_public_nonce = pyfrost.aggregate_nonce(
-                str_message, nonces_list, dkg_key['public_key'])
+                str_message, nonces_list)
             aggregated_public_nonce = pyfrost.frost.pub_to_code(
                 aggregated_public_nonce)
             for peer_id, data in signatures.items():

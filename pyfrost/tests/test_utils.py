@@ -160,7 +160,7 @@ class Test(unittest.TestCase):
                     keys.get_public_key(share, Utils.ecurve))
                 signatures.append(single_signature)
             group_nonce = frost.aggregate_nonce(
-                message, nonces_dict, group_key)
+                message, nonces_dict)
             for single_signature in signatures:
                 self.assertTrue(frost.verify_single_signature(single_signature['id'], message, nonces_dict, group_nonce, share_public_keys[single_signature['id']], single_signature, group_key),
                                 f"FROST logic failed to verify single signature by node : {single_signature['id']}")

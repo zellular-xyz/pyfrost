@@ -378,7 +378,7 @@ def verify_single_signature(id: int, message: str, nonces_dict: Dict[str, Dict[s
     return point1 == point2
 
 
-def aggregate_nonce(message: str, nonces_dict: Dict[str, Dict[str, int]], group_key: Point):
+def aggregate_nonce(message: str, nonces_dict: Dict[str, Dict[str, int]]):
     # Convert nonces to a list and calculate hashes
     nonces_list = list(nonces_dict.values())
     nonces_hash = Web3.keccak(text=json.dumps(nonces_list))
