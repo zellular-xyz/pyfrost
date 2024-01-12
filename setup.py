@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='pyfrost',
     version='0.1',
-    packages=find_packages(exclude=['pyfrost/tests', 'pyfrost/network_http/examples', 'pyfrost/network_libp2p/examples']),
+    packages=find_packages(exclude=['pyfrost/tests', 'pyfrost/example']),
     install_requires=[
         'web3==5.31.4',
         'ecpy==1.2.5',

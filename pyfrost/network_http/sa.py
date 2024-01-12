@@ -48,7 +48,7 @@ class SA:
             f'Nonces dictionary response: \n{json.dumps(nonces_response, indent=4)}')
         return nonces_response
 
-    async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
+    async def request_signature(self, dkg_key: Dict, nonces_dict: Dict,
                                 sa_data: Dict, sign_party: List) -> Dict:
         call_method = '/v1/sign'
         if not set(sign_party).issubset(set(dkg_key['party'])):
@@ -61,7 +61,7 @@ class SA:
         request_data = {
             'request_id': request_id,
             'dkg_public_key': dkg_key['public_key'],
-            'nonces_list': nonces_list,
+            'nonces_dict': nonces_dict,
             'data': sa_data
         }
         node_info = [self.nodes_info.lookup_node(
@@ -98,7 +98,7 @@ class SA:
         }
         if not len(set(aggregated_public_nonces)) == 1:
             aggregated_public_nonce = pyfrost.aggregate_nonce(
-                str_message, nonces_list)
+                str_message, nonces_dict)
             aggregated_public_nonce = pyfrost.frost.pub_to_code(
                 aggregated_public_nonce)
             for data in signatures.values():

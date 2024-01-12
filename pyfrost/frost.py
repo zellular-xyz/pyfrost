@@ -234,34 +234,20 @@ class Key:
             self.dkg_key_pair['dkg_public_key'])
         self.node_id = node_id
 
-    def sign(self, nonces_dict: Dict, message: str, nonces: List[Dict]) -> Tuple[Dict, Dict]:
+    def sign(self, nonces_dict: Dict, message: str, nonce_pair: Dict) -> Dict:
         assert isinstance(message, str), 'Message should be of string type.'
 
-        nonce_d, nonce_e = 0, 0
-        signature, used_nonce = None, None
-        my_nonce = nonces_dict[self.node_id]
-
-        for pair in nonces:
-            nonce_d = pair['nonce_d_pair'].get(my_nonce['public_nonce_d'])
-            nonce_e = pair['nonce_e_pair'].get(my_nonce['public_nonce_e'])
-
-            if nonce_d is not None and nonce_e is not None:
-                signature = single_sign(
-                    int(self.node_id),
-                    self.dkg_key_pair['share'],
-                    nonce_d,
-                    nonce_e,
-                    message,
-                    nonces_dict,
-                    pub_to_code(self.dkg_key_pair['dkg_public_key'])
-                )
-                used_nonce = {
-                    'nonce_d_pair': {my_nonce['public_nonce_d']: nonce_d},
-                    'nonce_e_pair': {my_nonce['public_nonce_e']: nonce_e}
-                }
-                break
-
-        return signature, used_nonce
+        signature = None
+        signature = single_sign(
+            int(self.node_id),
+            self.dkg_key_pair['share'],
+            nonce_pair['nonce_d'],
+            nonce_pair['nonce_e'],
+            message,
+            nonces_dict,
+            pub_to_code(self.dkg_key_pair['dkg_public_key'])
+        )
+        return signature
 
 
 def single_sign(id: str, share: int, nonce_d: int, nonce_e: int, message: str,

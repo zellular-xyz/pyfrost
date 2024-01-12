@@ -44,7 +44,7 @@ class SA(Libp2pBase):
             f'Nonces dictionary response: \n{json.dumps(nonces_response, indent=4)}')
         return nonces_response
 
-    async def request_signature(self, dkg_key: Dict, nonces_list: Dict,
+    async def request_signature(self, dkg_key: Dict, nonces_dict: Dict,
                                 sa_data: Dict, sign_party: Dict) -> Dict:
         call_method = 'sign'
         dkg_public_key = dkg_key['public_key']
@@ -58,7 +58,7 @@ class SA(Libp2pBase):
 
         parameters = {
             'dkg_public_key': dkg_public_key,
-            'nonces_list': nonces_list,
+            'nonces_dict': nonces_dict,
         }
         request_object = RequestObject(
             request_id, call_method, parameters, sa_data)
@@ -94,7 +94,7 @@ class SA(Libp2pBase):
         }
         if not len(set(aggregated_public_nonces)) == 1:
             aggregated_public_nonce = pyfrost.aggregate_nonce(
-                str_message, nonces_list)
+                str_message, nonces_dict)
             aggregated_public_nonce = pyfrost.frost.pub_to_code(
                 aggregated_public_nonce)
             for peer_id, data in signatures.items():
@@ -144,7 +144,7 @@ class Wrappers:
 
         sign = result[destination_peer_id]['signature_data']
         msg = result[destination_peer_id]['hash']
-        nonces_list = message['parameters']['nonces_list']
+        nonces_list = message['parameters']['nonces_dict']
         aggregated_public_nonce = pyfrost.frost.code_to_pub(
             sign['aggregated_public_nonce'])
         res = pyfrost.verify_single_signature(

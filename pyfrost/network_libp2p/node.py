@@ -12,30 +12,23 @@ import logging
 import types
 
 
-def auth_decorator(handler):
+def stream_handler(handler):
     async def wrapper(self, stream: INetStream):
-        try:
-            sender_id = stream.muxed_conn.peer_id
-            if self.caller_validator(sender_id.to_base58(), stream.get_protocol()):
-                message = await stream.read()
-                message = message.decode('utf-8')
-                data = json.loads(message)
-                logging.debug(
-                    f'{sender_id}{PROTOCOLS_ID["round1"]} Got message: {json.dumps(data, indent=4)}')
-                data = await handler(self, data)
-                response = json.dumps(data).encode('utf-8')
-                await stream.write(response)
-                logging.debug(
-                    f'{sender_id}{PROTOCOLS_ID["round1"]} Sent message: {json.dumps(data, indent=4)}')
-                await stream.close()
-            else:
-                logging.error(
-                    'Node Decorator => Error. Unauthorized SA.')
-                # TODO: raise exception and handle it.
-        except Exception as e:
-            logging.error(
-                f'Node => Exception occurred: {type(e).__name__}: {e}')
-            # TODO: raise exception and handle it.
+        sender_id = stream.muxed_conn.peer_id
+        if self.caller_validator(sender_id.to_base58(), stream.get_protocol()):
+            message = await stream.read()
+            message = message.decode('utf-8')
+            data = json.loads(message)
+            logging.debug(
+                f'{sender_id}{stream.get_protocol()} Got message: {json.dumps(data, indent=4)}')
+            data = await handler(self, data)
+            response = json.dumps(data).encode('utf-8')
+            await stream.write(response)
+            logging.debug(
+                f'{sender_id}{stream.get_protocol()} Sent message: {json.dumps(data, indent=4)}')
+            await stream.close()
+        else:
+            raise Exception('Error. Unauthorized SA.')
     return wrapper
 
 
@@ -60,7 +53,14 @@ class Node(Libp2pBase):
         self.set_protocol_and_handler(PROTOCOLS_ID, handlers)
         self.data_manager: DataManager = data_manager
 
-    def add_new_key(self, dkg_id: str, threshold, party: Dict) -> None:
+    @stream_handler
+    async def round1_handler(self, data: Dict) -> None:
+
+        parameters = data['parameters']
+        dkg_id = parameters['dkg_id']
+        party: Dict = parameters['party']
+        threshold = parameters['threshold']
+
         assert self.peer_id in list(
             party.values()), f'This node is not amoung specified party for app {dkg_id}'
         assert threshold <= len(
@@ -73,25 +73,8 @@ class Node(Libp2pBase):
         self.key_gens[dkg_id] = KeyGen(
             dkg_id, threshold, node_id, partners)
 
-    def remove_key(self, dkg_id: str) -> None:
-        if self.key_gens.get(dkg_id) is not None:
-            del self.key_gens[dkg_id]
-            # TODO: Maybe remove from database.
-
-    @auth_decorator
-    async def round1_handler(self, data: Dict) -> None:
-
-        parameters = data['parameters']
-        dkg_id = parameters['dkg_id']
-
-        self.add_new_key(
-            dkg_id,
-            parameters['threshold'],
-            parameters['party'],
-        )
         round1_broadcast_data = self.key_gens[dkg_id].round1()
         broadcast_bytes = json.dumps(round1_broadcast_data).encode('utf-8')
-        # TODO: check sign necessity of the round1
         data = {
             'broadcast': round1_broadcast_data,
             'validation': self._key_pair.private_key.sign(broadcast_bytes).hex(),
@@ -99,7 +82,7 @@ class Node(Libp2pBase):
         }
         return data
 
-    @auth_decorator
+    @stream_handler
     async def round2_handler(self, data: Dict) -> None:
 
         parameters = data['parameters']
@@ -125,16 +108,17 @@ class Node(Libp2pBase):
         }
         return data
 
-    @auth_decorator
+    @stream_handler
     async def round3_handler(self, data: Dict) -> None:
-        
+
         parameters = data['parameters']
         dkg_id = parameters['dkg_id']
         send_data = parameters['send_data']
 
         round3_data = self.key_gens[dkg_id].round3(send_data)
         if round3_data['status'] == 'COMPLAINT':
-            self.remove_key(dkg_id)
+            if self.key_gens.get(dkg_id) is not None:
+                del self.key_gens[dkg_id]
 
         round3_data['validation'] = None
         if round3_data['status'] == 'SUCCESSFUL':
@@ -152,7 +136,7 @@ class Node(Libp2pBase):
         }
         return data
 
-    @auth_decorator
+    @stream_handler
     async def generate_nonces_handler(self, data: Dict) -> None:
 
         parameters = data['parameters']
@@ -162,41 +146,43 @@ class Node(Libp2pBase):
             self.peer_id.to_base58())[1]
         nonces, save_data = create_nonces(
             int(node_id), number_of_nonces)
-        self.data_manager.set_nonces(save_data)
+        for nonce in save_data:
+            nonce_e_public, nonce_e_private = nonce['nonce_e_pair'].popitem()
+            self.data_manager.set_nonce(str(nonce_e_public), nonce_e_private)
+            nonce_d_public, nonce_d_private = nonce['nonce_d_pair'].popitem()
+            self.data_manager.set_nonce(str(nonce_d_public), nonce_d_private)
         data = {
             'nonces': nonces,
             'status': 'SUCCESSFUL',
         }
         return data
 
-    @auth_decorator
+    @stream_handler
     async def sign_handler(self, data: Dict) -> None:
         parameters = data['parameters']
         dkg_public_key = parameters['dkg_public_key']
-        nonces_list = parameters['nonces_list']
+        nonces_dict = parameters['nonces_dict']
         sa_data = data['data']
 
         result = {}
-        try:
-            result = self.data_validator(sa_data)
-            key_pair = self.data_manager.get_key(str(dkg_public_key))
-            key = Key(key_pair, self.nodes_info.lookup_node(
-                self.peer_id.to_base58())[1])
-            nonces = self.data_manager.get_nonces()
-            result['signature_data'], remove_data = key.sign(
-                nonces_list, result['hash'], nonces)
+        result = self.data_validator(sa_data)
+        key_pair = self.data_manager.get_key(str(dkg_public_key))
+        node_id = self.nodes_info.lookup_node(
+            self.peer_id.to_base58())[1]
+        key = Key(key_pair, node_id)
+        nonce_public_pair = nonces_dict[node_id]
+        nonce_d_public = nonce_public_pair['public_nonce_d']
+        nonce_e_public = nonce_public_pair['public_nonce_e']
+        nonce_d_private = self.data_manager.get_nonce(str(nonce_d_public))
+        nonce_e_private = self.data_manager.get_nonce(str(nonce_e_public))
+        nonce = {
+            'nonce_d': nonce_d_private,
+            'nonce_e': nonce_e_private
+        }
+        result['signature_data'] = key.sign(
+            nonces_dict, result['hash'], nonce)
+        self.data_manager.remove_nonce(str(nonce_d_public))
+        self.data_manager.remove_nonce(str(nonce_e_public))
 
-            try:
-                nonces.remove(remove_data)
-            except Exception as e:
-                logging.error(
-                    f'Node=> Nonces dont\'t exist to remove: {remove_data}')
-            self.data_manager.set_nonces(nonces)
-            result['status'] = 'SUCCESSFUL'
-        except Exception as e:
-            logging.error(
-                f'Node=> Exception occurred: {type(e).__name__}: {e}')
-            result = {
-                'status': 'FAILED'
-            }
+        result['status'] = 'SUCCESSFUL'
         return result

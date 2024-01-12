@@ -13,7 +13,7 @@ import types
 # TODO: how to simplify this
 
 
-def handler_decorator(func):
+def request_handler(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         route_path = request.url_rule.rule if request.url_rule else None
@@ -47,6 +47,7 @@ class Node:
         self.key_gens: Dict[str, KeyGen] = {}
 
         # TODO: Check validator functions if it cannot get as input. and just use in decorator.
+
         # Abstracts:
         self.nodes_info: NodesInfo = nodes_info
         self.caller_validator = caller_validator
@@ -54,20 +55,20 @@ class Node:
         self.data_manager: DataManager = data_manager
 
         # Adding routes:
-        self.app.route('/v1/dkg/round1', methods=['POST'])(self.round1_handler)
-        self.app.route('/v1/dkg/round2', methods=['POST'])(self.round2_handler)
-        self.app.route('/v1/dkg/round3', methods=['POST'])(self.round3_handler)
-        self.app.route('/v1/sign', methods=['POST'])(self.sign_handler)
+        self.app.route('/v1/dkg/round1', methods=['POST'])(self.round1)
+        self.app.route('/v1/dkg/round2', methods=['POST'])(self.round2)
+        self.app.route('/v1/dkg/round3', methods=['POST'])(self.round3)
+        self.app.route('/v1/sign', methods=['POST'])(self.sign)
         self.app.route('/v1/generate-nonces',
-                       methods=['POST'])(self.generate_nonces_handler)
+                       methods=['POST'])(self.generate_nonces)
 
     def run_app(self):
         node_info = self.nodes_info.lookup_node(self.node_id)
         self.app.run(host=node_info['host'], port=int(
             node_info['port']), debug=True, use_reloader=False)
 
-    @handler_decorator
-    def round1_handler(self):
+    @request_handler
+    def round1(self):
         data = request.get_json()
         party = data['party']
         dkg_id = data['dkg_id']
@@ -92,8 +93,8 @@ class Node:
         }
         return result
 
-    @handler_decorator
-    def round2_handler(self):
+    @request_handler
+    def round2(self):
         data = request.get_json()
         dkg_id = data['dkg_id']
         whole_broadcasted_data: Dict = data.get('broadcasted_data')
@@ -119,8 +120,8 @@ class Node:
         }
         return result
 
-    @handler_decorator
-    def round3_handler(self):
+    @request_handler
+    def round3(self):
         data = request.get_json()
         dkg_id = data['dkg_id']
         send_data = data['send_data']
@@ -129,7 +130,6 @@ class Node:
         if round3_data['status'] == 'COMPLAINT':
             if dkg_id in self.key_gens:
                 del self.key_gens[dkg_id]
-                # TODO: Maybe remove from database.
 
         round3_data['validation'] = None
         if round3_data['status'] == 'SUCCESSFUL':
@@ -147,34 +147,46 @@ class Node:
         }
         return result
 
-    @handler_decorator
-    def sign_handler(self):
+    @request_handler
+    def sign(self):
         data = request.get_json()
         dkg_public_key = data['dkg_public_key']
-        nonces_list = data['nonces_list']
+        nonces_dict = data['nonces_dict']
         sa_data = data['data']
         request_id = data['request_id']
         result = self.data_validator(sa_data)
         key_pair = self.data_manager.get_key(str(dkg_public_key))
         key = Key(key_pair, self.node_id)
-        nonces = self.data_manager.get_nonces()
-        result['signature_data'], remove_data = key.sign(
-            nonces_list, result['hash'], nonces)
-        nonces.remove(remove_data)
 
-        self.data_manager.set_nonces(nonces)
+        nonce_public_pair = nonces_dict[self.node_id]
+        nonce_d_public = nonce_public_pair['public_nonce_d']
+        nonce_e_public = nonce_public_pair['public_nonce_e']
+        nonce_d_private = self.data_manager.get_nonce(str(nonce_d_public))
+        nonce_e_private = self.data_manager.get_nonce(str(nonce_e_public))
+        nonce = {
+            'nonce_d': nonce_d_private,
+            'nonce_e': nonce_e_private
+        }
+        result['signature_data'] = key.sign(
+            nonces_dict, result['hash'], nonce)
+        self.data_manager.remove_nonce(str(nonce_d_public))
+        self.data_manager.remove_nonce(str(nonce_e_public))
 
         result['status'] = 'SUCCESSFUL'
         result['request_id'] = request_id
         return result
 
-    @handler_decorator
-    def generate_nonces_handler(self):
+    @request_handler
+    def generate_nonces(self):
         data = request.get_json()
         number_of_nonces = data['number_of_nonces']
         nonces, save_data = create_nonces(
             int(self.node_id), number_of_nonces)
-        self.data_manager.set_nonces(save_data)
+        for nonce in save_data:
+            nonce_e_public, nonce_e_private = nonce['nonce_e_pair'].popitem()
+            self.data_manager.set_nonce(str(nonce_e_public), nonce_e_private)
+            nonce_d_public, nonce_d_private = nonce['nonce_d_pair'].popitem()
+            self.data_manager.set_nonce(str(nonce_d_public), nonce_d_private)
         result = {
             'data': nonces,
             'status': 'SUCCESSFUL',
