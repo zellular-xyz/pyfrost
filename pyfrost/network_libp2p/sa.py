@@ -1,6 +1,8 @@
 from libp2p.host.host_interface import IHost
 from libp2p.peer.id import ID as PeerID
 from libp2p.typing import TProtocol
+from fastecdsa.encoding.sec1 import SEC1Encoder
+from fastecdsa import curve
 from typing import Dict
 from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
 from .abstract import NodesInfo
@@ -95,8 +97,6 @@ class SA(Libp2pBase):
         if not len(set(aggregated_public_nonces)) == 1:
             aggregated_public_nonce = pyfrost.aggregate_nonce(
                 str_message, nonces_dict)
-            aggregated_public_nonce = pyfrost.frost.pub_to_code(
-                aggregated_public_nonce)
             for peer_id, data in signatures.items():
                 if data['signature_data']['aggregated_public_nonce'] != aggregated_public_nonce:
                     data['status'] = 'MALICIOUS'
@@ -114,9 +114,8 @@ class SA(Libp2pBase):
             logging.info(f'Signature response: {response}')
             return response
 
-        # TODO: Remove pub_to_code
-        aggregated_public_nonce = pyfrost.frost.code_to_pub(
-            aggregated_public_nonces[0])
+        aggregated_public_nonce = SEC1Encoder.decode_public_key(bytes.fromhex(
+            hex(aggregated_public_nonces[0]).replace('x', '')), curve.secp256k1)
         aggregated_sign = pyfrost.aggregate_signatures(
             str_message, signs, aggregated_public_nonce, dkg_key['public_key'])
         if pyfrost.frost.verify_group_signature(aggregated_sign):
@@ -145,8 +144,9 @@ class Wrappers:
         sign = result[destination_peer_id]['signature_data']
         msg = result[destination_peer_id]['hash']
         nonces_dict = message['parameters']['nonces_dict']
-        aggregated_public_nonce = pyfrost.frost.code_to_pub(
-            sign['aggregated_public_nonce'])
+        aggregated_public_nonce = SEC1Encoder.decode_public_key(bytes.fromhex(
+            hex(sign['aggregated_public_nonce']).replace('x', '')), curve.secp256k1)
+        
         signature_data = {
             'id': sign['id'],
             'message': msg,

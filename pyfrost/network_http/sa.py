@@ -1,4 +1,6 @@
 from typing import List, Dict
+from fastecdsa.encoding.sec1 import SEC1Encoder
+from fastecdsa import curve
 from .abstract import NodesInfo
 from .dkg import post_request
 import pyfrost
@@ -20,8 +22,8 @@ async def sign_request(url: str, dkg_key: Dict, data: Dict, timeout: int = 10):
                 sign = result['signature_data']
                 msg = result['hash']
                 nonces_dict = data['nonces_dict']
-                aggregated_public_nonce = pyfrost.frost.code_to_pub(
-                    sign['aggregated_public_nonce'])
+                aggregated_public_nonce = SEC1Encoder.decode_public_key(bytes.fromhex(
+                    hex(sign['aggregated_public_nonce']).replace('x', '')), curve.secp256k1)
                 signature_data = {
                     'id': sign['id'],
                     'message': msg,
@@ -123,8 +125,7 @@ class SA:
             # TODO: Ask Mr. Shoara.
             aggregated_public_nonce = pyfrost.aggregate_nonce(
                 str_message, nonces_dict)
-            aggregated_public_nonce = pyfrost.frost.pub_to_code(
-                aggregated_public_nonce)
+            
             for data in signatures.values():
                 if data['signature_data']['aggregated_public_nonce'] != aggregated_public_nonce:
                     data['status'] = 'MALICIOUS'
@@ -142,9 +143,9 @@ class SA:
             logging.info(f'Signature response: {response}')
             return response
 
-        # TODO: Remove pub_to_code
-        aggregated_public_nonce = pyfrost.frost.code_to_pub(
-            aggregated_public_nonces[0])
+        aggregated_public_nonce = SEC1Encoder.decode_public_key(bytes.fromhex(
+            hex(aggregated_public_nonces[0]).replace('x', '')), curve.secp256k1)
+
         aggregated_sign = pyfrost.aggregate_signatures(
             str_message, signs, aggregated_public_nonce, dkg_key['public_key'])
         if pyfrost.frost.verify_group_signature(aggregated_sign):

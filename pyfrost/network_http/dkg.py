@@ -1,13 +1,13 @@
 from typing import List, Dict
 from fastecdsa import ecdsa, curve
-from pyfrost.crypto_utils import code_to_pub
+from fastecdsa.encoding.sec1 import SEC1Encoder
+from fastecdsa import curve
 from .abstract import NodesInfo
 import logging
 import json
 import uuid
 import asyncio
 import aiohttp
-# TODO: remove code_to_pub
 
 
 async def post_request(url: str, data: Dict, timeout: int = 10):
@@ -63,7 +63,7 @@ class Dkg:
             'threshold': threshold,
         }
 
-        #TODO: Check the sign verifications.
+        # TODO: Check the sign verifications.
 
         node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
         urls = [f'http://{node["host"]}:{node["port"]}' +
@@ -93,9 +93,12 @@ class Dkg:
             data_bytes = json.dumps(
                 data['broadcast'], sort_keys=True).encode('utf-8')
             signature = data['validation']
-            public_key = self.nodes_info.lookup_node(node_id)['public_key']
+            public_key_code = self.nodes_info.lookup_node(node_id)[
+                'public_key']
+            public_key = SEC1Encoder.decode_public_key(bytes.fromhex(
+                hex(public_key_code).replace('x', '')), curve.secp256k1)
             verify_result = ecdsa.verify(
-                signature, data_bytes, code_to_pub(public_key), curve=curve.secp256k1)
+                signature, data_bytes, public_key, curve=curve.secp256k1)
             logging.debug(
                 f'Verification of sent data from {node_id}: {verify_result}')
 

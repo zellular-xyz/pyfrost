@@ -1,10 +1,10 @@
 from flask import Flask, request, jsonify, abort
 from functools import wraps
 from pyfrost.frost import Key, KeyGen
-from pyfrost.crypto_utils import code_to_pub
 from pyfrost import create_nonces
-from typing import Dict, List
-from fastecdsa import ecdsa, curve, keys
+from typing import Dict
+from fastecdsa.encoding.sec1 import SEC1Encoder
+from fastecdsa import ecdsa, curve
 from .abstract import NodesInfo, DataManager
 import json
 import logging
@@ -102,10 +102,12 @@ class Node:
             # TODO: error handling (if verification failed)
             data_bytes = json.dumps(data['broadcast']).encode('utf-8')
             validation = data['validation']
-            public_key = self.nodes_info.lookup_node(self.node_id)[
+            public_key_code = self.nodes_info.lookup_node(self.node_id)[
                 'public_key']
+            public_key = SEC1Encoder.decode_public_key(bytes.fromhex(
+                hex(public_key_code).replace('x', '')), curve.secp256k1)
             verify_result = ecdsa.verify(
-                validation, data_bytes, code_to_pub(public_key), curve=curve.secp256k1)
+                validation, data_bytes, public_key, curve=curve.secp256k1)
             logging.debug(
                 f'Verification of sent data from {node_id}: {verify_result}')
             broadcasted_data.append(data['broadcast'])

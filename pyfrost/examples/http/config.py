@@ -1,5 +1,5 @@
 from fastecdsa import keys, curve
-from pyfrost.crypto_utils import pub_to_code
+from fastecdsa.encoding.sec1 import SEC1Encoder
 import hashlib
 
 VALIDATED_IPS = {
@@ -18,8 +18,10 @@ def generate_privates_and_nodes_info(number: int = 100):
         new_private = int.from_bytes(
             hashed, byteorder='big') % curve.secp256k1.q
         previous_key = new_private
+        public_key = keys.get_public_key(new_private, curve.secp256k1)
+        compressed_pub_key = int(SEC1Encoder.encode_public_key(public_key, True).hex(), 16)
         nodes_info_dict[str(i+1)] = {
-            'public_key': pub_to_code(keys.get_public_key(new_private, curve.secp256k1)),
+            'public_key': compressed_pub_key,
             'host': '127.0.0.1',
             'port': str(5000+i)
         }
