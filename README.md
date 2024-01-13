@@ -250,19 +250,29 @@ To run tests, navigate to the root directory and run the fallowing command:
 
 ## How to Run an Example
 
-To run an example network, open `m` additional terminals for `m` nodes and activate the `venv` in these terminals. Note that `m` is an arbitrary positive number, but it must not exceed 99 due to predefined nodes in the example setup. Then navigate to the `pyfrost/network/examples/` directory:
+To run an example network, open `m` additional terminals for `m` nodes and activate the `venv` in these terminals. Note that `m` is an arbitrary positive number, but it must not exceed 99 due to predefined nodes in the example setup. Then navigate to the `pyfrost/examples/` directory:
 
 ```bash
 (venv) $ cd pyfrost/network/examples/
 ```
 
-First, initialize the nodes by typing the following command in `m` terminals:
-
+For http network example, change directory to `http`:
 ```bash
-(venv) $ python node.py [0-m]
+(venv) $ cd http/
 ```
 
-Wait for the node setup to complete, which is indicated by the node API being printed and a message stating **Waiting for incoming connections...**
+And for libp2p network example, change directory to `libp2p`:
+```bash
+(venv) $ cd libp2p/
+```
+
+In any of the `libp2p` or `http` direcotories, first initialize the nodes by typing the following command in `m` terminals:
+
+```bash
+(venv) $ python node.py [1-m]
+```
+
+Wait for the node setup to complete, which is indicated by the node API being printed and a message stating **Waiting for incoming connections...** for `libp2p` connections and **Serving Flask app 'pyfrost.network_http.node'** for `http` connections.
 
 Finally, run the `example.py` script in the last terminal:
 

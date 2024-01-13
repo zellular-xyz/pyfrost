@@ -68,18 +68,29 @@ class TestCaseKey(unittest.TestCase):
             nonces_data[key.node_id] = nonce
         signs = []
         agregated_nonces = []
+        
         for key in sign_subset:
-
-            single_sign, remove_data = key.sign(
-                nonces_data, msg, saved_data['private_data'][key.node_id]['nonces'])
-
+            nonce_public_pair = nonces_data[key.node_id]
+            my_nonce_d_public = nonce_public_pair['public_nonce_d']
+            my_nonce_e_public = nonce_public_pair['public_nonce_e']
+            nonce_d_private, nonce_e_private = 0, 0
+            for nonces in saved_data['private_data'][key.node_id].values():
+                for nonce in nonces:
+                    nonce_e_public, nonce_e_private = nonce['nonce_e_pair'].popitem()
+                    nonce_d_public, nonce_d_private = nonce['nonce_d_pair'].popitem()
+                    if my_nonce_d_public == nonce_d_public and my_nonce_e_public == nonce_e_public:
+                        break
+            nonce = {
+                'nonce_d': nonce_d_private,
+                'nonce_e': nonce_e_private
+            }
+            single_sign = key.sign(
+                nonces_data, msg, nonce)
             self.assertTrue(pyfrost.verify_single_signature(int(key.node_id), msg, nonces_data, Utils.code_to_pub(single_sign['aggregated_public_nonce']), Utils.pub_to_code(crypto.get_public_key(key.dkg_key_pair['share'], Utils.ecurve)), single_sign, Utils.pub_to_code(key.dkg_key_pair['dkg_public_key'])),
                             f"SINGLE SIGNATURE FAILED BY NODE {key.node_id}"
                             )
-
             signs.append(single_sign)
-            saved_data['private_data'][key.node_id]['nonces'].remove(
-                remove_data)
+            # TODO: Add remove data.
             agregated_nonces.append(single_sign['aggregated_public_nonce'])
         self.assertEqual(len(set(agregated_nonces)),
                          1, 'AGREGATED NONCES FAILED')
