@@ -2,13 +2,29 @@ from typing import List, Dict
 from fastecdsa import ecdsa, curve
 from pyfrost.crypto_utils import code_to_pub
 from .abstract import NodesInfo
-from .sa import post_request
 import logging
 import json
 import uuid
 import asyncio
-
+import aiohttp
 # TODO: remove code_to_pub
+
+
+async def post_request(url: str, data: Dict, timeout: int = 10):
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=data, timeout=timeout) as response:
+            try:
+                return await response.json()
+            except asyncio.TimeoutError:
+                return {
+                    'status': 'TIMEOUT',
+                    'error': 'Communication timed out',
+                }
+            except Exception as e:
+                return {
+                    'status': 'ERROR',
+                    'error': f'An exception occurred: {type(e).__name__}: {e}',
+                }
 
 
 class Dkg:

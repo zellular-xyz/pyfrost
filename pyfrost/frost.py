@@ -326,17 +326,16 @@ def create_nonces(node_id: int, number_of_nonces: int = 10) -> Tuple[List[Dict],
     return nonce_publics, nonce_privates
 
 
-def verify_single_signature(id: int, message: str, nonces_dict: Dict[str, Dict[str, int]], aggregated_public_nonce: Point,
-                            public_key_share: int, single_signature: Dict[str, int], group_key: Point) -> bool:
+def verify_single_signature(signature_data: Dict) -> bool:
     # Prepare hashes and list
-    nonces_list = list(nonces_dict.values())
-    nonces_hash = Web3.keccak(text=json.dumps(nonces_list))
-    message_bytes = message.encode('utf-8')
+    nonces_dict = list(signature_data['nonces_dict'].values())
+    nonces_hash = Web3.keccak(text=json.dumps(nonces_dict))
+    message_bytes = signature_data['message'].encode('utf-8')
 
     # Find the relevant nonce and calculate the public nonce
     public_nonce, index = None, 0
-    for idx, nonce in enumerate(nonces_list):
-        if nonce['id'] == id:
+    for idx, nonce in enumerate(nonces_dict):
+        if nonce['id'] == signature_data['id']:
             nonce_d_public = code_to_pub(nonce['public_nonce_d'])
             nonce_e_public = code_to_pub(nonce['public_nonce_e'])
             row = Web3.solidity_keccak(['string', 'bytes', 'bytes'],
@@ -347,18 +346,19 @@ def verify_single_signature(id: int, message: str, nonces_dict: Dict[str, Dict[s
             break
 
     # Calculate challenge
-    group_key_pub = pub_compress(code_to_pub(group_key))
+    group_key_pub = pub_compress(code_to_pub(signature_data['group_key']))
     challenge = Web3.solidity_keccak(
         ['uint256', 'uint8', 'uint256', 'address'],
         [Web3.to_int(hexstr=group_key_pub['x']), group_key_pub['y_parity'],
-         Web3.to_int(message_bytes), pub_to_addr(aggregated_public_nonce)]
+         Web3.to_int(message_bytes), pub_to_addr(signature_data['aggregated_public_nonce'])]
     )
 
     # Calculate coefficients and points
-    coef = langrange_coef(index, len(nonces_list), nonces_list, 0)
+    coef = langrange_coef(index, len(nonces_dict), nonces_dict, 0)
     point1 = public_nonce - \
-        (int.from_bytes(challenge, 'big') * coef * code_to_pub(public_key_share))
-    point2 = single_signature['signature'] * ecurve.G
+        (int.from_bytes(challenge, 'big') * coef *
+         code_to_pub(signature_data['public_key_share']))
+    point2 = signature_data['single_signature']['signature'] * ecurve.G
 
     # Verify the points
     return point1 == point2

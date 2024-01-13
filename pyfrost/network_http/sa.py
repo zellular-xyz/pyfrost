@@ -1,18 +1,40 @@
 from typing import List, Dict
 from .abstract import NodesInfo
+from .dkg import post_request
 import pyfrost
 import logging
 import json
 import uuid
-import aiohttp
 import asyncio
+import aiohttp
 
 
-async def post_request(url: str, data: Dict, timeout: int = 10):
+async def sign_request(url: str, dkg_key: Dict, data: Dict, timeout: int = 10):
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=data, timeout=timeout) as response:
             try:
-                return await response.json()
+                result = await response.json()
+                if result['status'] != 'SUCCESSFUL':
+                    return result
+
+                sign = result['signature_data']
+                msg = result['hash']
+                nonces_dict = data['nonces_dict']
+                aggregated_public_nonce = pyfrost.frost.code_to_pub(
+                    sign['aggregated_public_nonce'])
+                signature_data = {
+                    'id': sign['id'],
+                    'message': msg,
+                    'nonces_dict': nonces_dict,
+                    'aggregated_public_nonce': aggregated_public_nonce,
+                    'public_key_share': dkg_key['public_shares'][str(sign['id'])],
+                    'single_signature': sign,
+                    'group_key': dkg_key['public_key']
+                }
+                res = pyfrost.verify_single_signature(signature_data)
+                if not res:
+                    result['status'] = 'MALICIOUS'
+                return result
             except asyncio.TimeoutError:
                 return {
                     'status': 'TIMEOUT',
@@ -68,13 +90,14 @@ class SA:
             node_id) for node_id in sign_party]
         urls = [f'http://{node["host"]}:{node["port"]}' +
                 call_method for node in node_info]
-        request_tasks = [post_request(
-            url, request_data, self.default_timeout) for url in urls]
+        request_tasks = [sign_request(
+            url, dkg_key, request_data, self.default_timeout) for url in urls]
         responses = await asyncio.gather(*request_tasks)
         signatures = dict(zip(sign_party, responses))
 
         logging.debug(
             f'Signatures dictionary response: \n{json.dumps(signatures, indent=4)}')
+
         sample_result = []
         signs = []
         aggregated_public_nonces = []

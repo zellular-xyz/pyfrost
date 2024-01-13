@@ -144,10 +144,18 @@ class Wrappers:
 
         sign = result[destination_peer_id]['signature_data']
         msg = result[destination_peer_id]['hash']
-        nonces_list = message['parameters']['nonces_dict']
+        nonces_dict = message['parameters']['nonces_dict']
         aggregated_public_nonce = pyfrost.frost.code_to_pub(
             sign['aggregated_public_nonce'])
-        res = pyfrost.verify_single_signature(
-            sign['id'], msg, nonces_list, aggregated_public_nonce, dkg_key['public_shares'][str(sign['id'])], sign, dkg_key['public_key'])
+        signature_data = {
+            'id': sign['id'],
+            'message': msg,
+            'nonces_dict': nonces_dict,
+            'aggregated_public_nonce': aggregated_public_nonce,
+            'public_key_share': dkg_key['public_shares'][str(sign['id'])],
+            'single_signature': sign,
+            'group_key': dkg_key['public_key']
+        }
+        res = pyfrost.verify_single_signature(signature_data)
         if not res:
             result[destination_peer_id]['status'] = 'MALICIOUS'
