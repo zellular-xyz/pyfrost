@@ -68,7 +68,7 @@ class TestCaseKey(unittest.TestCase):
             nonces_data[key.node_id] = nonce
         signs = []
         agregated_nonces = []
-        
+
         for key in sign_subset:
             nonce_public_pair = nonces_data[key.node_id]
             my_nonce_d_public = nonce_public_pair['public_nonce_d']
@@ -76,8 +76,10 @@ class TestCaseKey(unittest.TestCase):
             nonce_d_private, nonce_e_private = 0, 0
             for nonces in saved_data['private_data'][key.node_id].values():
                 for nonce in nonces:
-                    nonce_e_public, nonce_e_private = nonce['nonce_e_pair'].popitem()
-                    nonce_d_public, nonce_d_private = nonce['nonce_d_pair'].popitem()
+                    nonce_e_public, nonce_e_private = nonce['nonce_e_pair'].popitem(
+                    )
+                    nonce_d_public, nonce_d_private = nonce['nonce_d_pair'].popitem(
+                    )
                     if my_nonce_d_public == nonce_d_public and my_nonce_e_public == nonce_e_public:
                         break
             nonce = {
@@ -86,7 +88,16 @@ class TestCaseKey(unittest.TestCase):
             }
             single_sign = key.sign(
                 nonces_data, msg, nonce)
-            self.assertTrue(pyfrost.verify_single_signature(int(key.node_id), msg, nonces_data, Utils.code_to_pub(single_sign['aggregated_public_nonce']), Utils.pub_to_code(crypto.get_public_key(key.dkg_key_pair['share'], Utils.ecurve)), single_sign, Utils.pub_to_code(key.dkg_key_pair['dkg_public_key'])),
+            signature_data = {
+                'id': int(key.node_id),
+                'message': msg,
+                'nonces_dict': nonces_data,
+                'aggregated_public_nonce': Utils.code_to_pub(single_sign['aggregated_public_nonce']),
+                'public_key_share': Utils.pub_to_code(crypto.get_public_key(key.dkg_key_pair['share'], Utils.ecurve)),
+                'single_signature': single_sign,
+                'group_key': Utils.pub_to_code(key.dkg_key_pair['dkg_public_key'])
+            }
+            self.assertTrue(pyfrost.verify_single_signature(signature_data),
                             f"SINGLE SIGNATURE FAILED BY NODE {key.node_id}"
                             )
             signs.append(single_sign)

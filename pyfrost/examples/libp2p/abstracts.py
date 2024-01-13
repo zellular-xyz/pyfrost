@@ -1,8 +1,7 @@
 from pyfrost.network_libp2p.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
-from libp2p.typing import TProtocol
 from config import VALIDATED_CALLERS, generate_secrets_and_nodes_info
 from itertools import islice
-from typing import Dict, List
+from typing import Dict, Any
 import hashlib
 import json
 
@@ -37,8 +36,8 @@ class NodeValidators(Validators):
         super().__init__()
 
     @staticmethod
-    def caller_validator(sender_id: str, protocol: TProtocol):
-        if protocol in VALIDATED_CALLERS.get(str(sender_id), {}):
+    def caller_validator(ip: str, method: Any):
+        if method in VALIDATED_CALLERS.get(str(ip), {}):
             return True
         return False
 

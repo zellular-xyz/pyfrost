@@ -62,6 +62,9 @@ class Dkg:
             'dkg_id': dkg_id,
             'threshold': threshold,
         }
+
+        #TODO: Check the sign verifications.
+
         node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
         urls = [f'http://{node["host"]}:{node["port"]}' +
                 call_method for node in node_info]

@@ -10,8 +10,6 @@ import json
 import logging
 import types
 
-# TODO: how to simplify this
-
 
 def request_handler(func):
     @wraps(func)

@@ -37,8 +37,6 @@ class NodesInfo(ABC):
     def get_all_nodes(self, n: int = None) -> Dict:
         pass
 
-# TODO: Use request object instead of method
-
 
 class Validators(ABC):
     @staticmethod

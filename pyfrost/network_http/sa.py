@@ -120,6 +120,7 @@ class SA:
             'signatures': None
         }
         if not len(set(aggregated_public_nonces)) == 1:
+            # TODO: Ask Mr. Shoara.
             aggregated_public_nonce = pyfrost.aggregate_nonce(
                 str_message, nonces_dict)
             aggregated_public_nonce = pyfrost.frost.pub_to_code(

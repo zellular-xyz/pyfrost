@@ -162,7 +162,16 @@ class Test(unittest.TestCase):
             group_nonce = frost.aggregate_nonce(
                 message, nonces_dict)
             for single_signature in signatures:
-                self.assertTrue(frost.verify_single_signature(single_signature['id'], message, nonces_dict, group_nonce, share_public_keys[single_signature['id']], single_signature, group_key),
+                signature_data = {
+                    'id': single_signature['id'],
+                    'message': message,
+                    'nonces_dict': nonces_dict,
+                    'aggregated_public_nonce': group_nonce,
+                    'public_key_share': share_public_keys[single_signature['id']],
+                    'single_signature': single_signature,
+                    'group_key': group_key
+                }
+                self.assertTrue(frost.verify_single_signature(signature_data),
                                 f"FROST logic failed to verify single signature by node : {single_signature['id']}")
 
             group_sign = frost.aggregate_signatures(

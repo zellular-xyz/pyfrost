@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from libp2p.typing import TProtocol
 from typing import Dict, List, Any
 
 
@@ -42,7 +41,7 @@ class NodesInfo(ABC):
 class Validators(ABC):
     @staticmethod
     @abstractmethod
-    def caller_validator(ip: str, protocol: Any):
+    def caller_validator(ip: str, method: Any):
         pass
 
     @staticmethod
