@@ -28,7 +28,7 @@ class NodeDataManager(DataManager):
         return self.__dkg_keys.get(key, {})
     
     def remove_key(self, key):
-        del self.__nonces[key]
+        del self.__dkg_keys[key]
 
 
 class NodeValidators(Validators):

@@ -5,6 +5,7 @@ from pyfrost import create_nonces
 from typing import Dict
 from fastecdsa.encoding.sec1 import SEC1Encoder
 from fastecdsa import ecdsa, curve
+from fastecdsa.point import Point
 from .abstract import NodesInfo, DataManager
 import json
 import logging
@@ -156,6 +157,10 @@ class Node:
         request_id = data['request_id']
         result = self.data_validator(sa_data)
         key_pair = self.data_manager.get_key(str(dkg_public_key))
+        # TODO: Must remove
+        if type(key_pair['dkg_public_key']) == Point:
+            comp_pub = SEC1Encoder.encode_public_key(key_pair['dkg_public_key'], True)
+            key_pair['dkg_public_key'] =  int(comp_pub.hex(), 16)
         key = Key(key_pair, self.node_id)
 
         nonce_public_pair = nonces_dict[self.node_id]
