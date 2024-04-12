@@ -8,11 +8,11 @@ from fastecdsa import keys, curve
 from fastecdsa.curve import Curve
 from fastecdsa.point import Point
 from typing import List, Dict
-from web3 import Web3
 
 import math
 import json
 import base64
+from hashlib import sha256
 
 
 class Polynomial:
@@ -130,10 +130,10 @@ def mod_inverse(number: int, modulus: int) -> int:
 
 
 def pub_to_addr(public_key: Point) -> str:
-    pub_key_hex = str(hex(public_key.x))[
-        2:] + str(hex(public_key.y)).replace('0x', '')
-    pub_hash = Web3.keccak(int(pub_key_hex, 16))
-    return Web3.to_checksum_address('0x'+str(pub_hash.hex())[-40:])
+    pub_key_hex = f"{public_key.x:#0{66}x}".replace('0x', '') +\
+        f"{public_key.y:#0{66}x}".replace('0x', '')
+    pub_hash = sha256(pub_key_hex.encode()).hexdigest()
+    return '0x'+pub_hash[-40:]
 
 
 def pub_to_code(public_key: Point) -> int:
@@ -207,9 +207,9 @@ def reconstruct_share(shares: List[Dict], threshold: int, x: int) -> int:
 def schnorr_hash(public_key: Point, message: int) -> str:
     address = pub_to_addr(public_key)
     addressBuff = str(address).replace('0x', '')
-    msgBuff = str(hex(message)).replace('0x', '')
+    msgBuff = f"{message:#0{66}x}".replace('0x', '')
     totalBuff = addressBuff + msgBuff
-    return Web3.keccak(int(totalBuff, 16))
+    return sha256(bytes.fromhex(totalBuff)).digest()
 
 
 def schnorr_sign(shared_private_key: int, nounce_private: int, nounce_public: Point, message: int) -> Dict[str, int]:

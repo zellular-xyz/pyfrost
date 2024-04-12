@@ -1,5 +1,5 @@
-from pyfrost.network_http.sa import SA
-from pyfrost.network_http.dkg import Dkg
+from pyfrost.network.sa import SA
+from pyfrost.network.dkg import Dkg
 from typing import Dict, List
 from abstracts import NodesInfo
 import logging

@@ -1,12 +1,13 @@
 from pyfrost.crypto_utils import Polynomial
 from fastecdsa import keys
 from pyfrost import frost
-from web3 import Web3
 
 import pyfrost.crypto_utils as Utils
 import random
 import json
 import unittest
+from hashlib import sha256
+
 
 # filling with [1 , 2, .... , 50 , N-50 , N- 49 , ... , N-1]
 test_list = [i for i in range(1, 51)] + [Utils.N-i for i in range(1, 51)]
@@ -100,8 +101,7 @@ class Test(unittest.TestCase):
         key_shares = key_generate(nodes, threshold)
         key_nonces = key_generate(nodes, threshold)
 
-        message_hash = int.from_bytes(Web3.solidity_keccak(
-            ['string'], ["Hello every body"]), 'big')
+        message_hash = int.from_bytes(sha256(b"Hello every body").digest(), 'big')
 
         signatures = []
         for key_share in key_shares:

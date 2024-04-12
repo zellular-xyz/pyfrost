@@ -1,4 +1,4 @@
-from pyfrost.network_http.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
+from pyfrost.network.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
 from config import VALIDATED_IPS, generate_privates_and_nodes_info
 from typing import Dict, List
 import hashlib

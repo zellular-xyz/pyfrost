@@ -1,4 +1,4 @@
-from pyfrost.network_http.node import Node
+from pyfrost.network.node import Node
 from abstracts import NodesInfo, NodeDataManager, NodeValidators
 from config import generate_privates_and_nodes_info
 import os
