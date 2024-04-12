@@ -8,6 +8,6 @@ setup(
         'fastecdsa==2.2.3',
         'Flask==3.0.0',
         'cryptography',
-        'aiohttp'
+        'aiohttp==3.9.3'
     ],
 )
