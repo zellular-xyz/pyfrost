@@ -104,7 +104,8 @@ class SA:
         signs = []
         aggregated_public_nonces = []
         str_message = None
-        for data in signatures.values():
+        for node_id, data in signatures.items():
+            assert data['status'] != 'ERROR', f'node_id: {node_id}, data: {data}'
             _hash = data.get('hash')
             _signature_data = data.get('signature_data')
             _aggregated_public_nonce = data.get(
