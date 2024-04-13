@@ -29,6 +29,10 @@ class DataManager(ABC):
 
 
 class NodesInfo(ABC):
+    @property
+    def prefix(self):
+        pass
+
     @abstractmethod
     def lookup_node(self, node_id: str):
         pass

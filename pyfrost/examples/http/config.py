@@ -3,7 +3,7 @@ from fastecdsa.encoding.sec1 import SEC1Encoder
 import hashlib
 
 VALIDATED_IPS = {
-    '127.0.0.1': ['/v1/dkg/round1', '/v1/dkg/round2', '/v1/dkg/round3', '/v1/sign', '/v1/generate-nonces']
+    '127.0.0.1': ['/pyfrost/v1/dkg/round1', '/pyfrost/v1/dkg/round2', '/pyfrost/v1/dkg/round3', '/pyfrost/v1/sign', '/pyfrost/v1/generate-nonces']
 }
 
 

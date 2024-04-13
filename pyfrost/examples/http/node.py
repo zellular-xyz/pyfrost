@@ -1,9 +1,10 @@
-from pyfrost.network.node import Node
-from abstracts import NodesInfo, NodeDataManager, NodeValidators
-from config import generate_privates_and_nodes_info
 import os
 import logging
 import sys
+from flask import Flask
+from pyfrost.network.node import Node
+from abstracts import NodesInfo, NodeDataManager, NodeValidators
+from config import generate_privates_and_nodes_info
 
 
 def run_node(node_number: int) -> None:
@@ -12,11 +13,12 @@ def run_node(node_number: int) -> None:
     privates, _ = generate_privates_and_nodes_info()
     node = Node(data_manager, str(node_number), privates[node_number-1], nodes_info,
                 NodeValidators.caller_validator, NodeValidators.data_validator)
-    node.run_app()
-
+    node_info = nodes_info.lookup_node(str(node_number))
+    app = Flask(__name__)
+    app.register_blueprint(node.blueprint, url_prefix="/pyfrost")
+    app.run(host=node_info['host'], port=int(node_info['port']), debug=True)
 
 if __name__ == '__main__':
-
     node_number = int(sys.argv[1])
     file_path = 'logs'
     file_name = f'node{node_number}.log'

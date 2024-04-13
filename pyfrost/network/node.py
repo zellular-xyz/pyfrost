@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, abort
+from flask import Blueprint, request, jsonify, abort
 from functools import wraps
 from pyfrost.frost import Key, KeyGen
 from pyfrost import create_nonces
@@ -40,7 +40,7 @@ class Node:
     def __init__(self, data_manager: DataManager, node_id: int, private: int, nodes_info: NodesInfo, caller_validator: types.FunctionType,
                  data_validator: types.FunctionType) -> None:
 
-        self.app = Flask(__name__)
+        self.blueprint = Blueprint('pyfrost', __name__)
         self.private = private
         self.node_id = str(node_id)
         self.key_gens: Dict[str, KeyGen] = {}
@@ -54,17 +54,13 @@ class Node:
         self.data_manager: DataManager = data_manager
 
         # Adding routes:
-        self.app.route('/v1/dkg/round1', methods=['POST'])(self.round1)
-        self.app.route('/v1/dkg/round2', methods=['POST'])(self.round2)
-        self.app.route('/v1/dkg/round3', methods=['POST'])(self.round3)
-        self.app.route('/v1/sign', methods=['POST'])(self.sign)
-        self.app.route('/v1/generate-nonces',
+        self.blueprint.route('/v1/dkg/round1', methods=['POST'])(self.round1)
+        self.blueprint.route('/v1/dkg/round2', methods=['POST'])(self.round2)
+        self.blueprint.route('/v1/dkg/round3', methods=['POST'])(self.round3)
+        self.blueprint.route('/v1/sign', methods=['POST'])(self.sign)
+        self.blueprint.route('/v1/generate-nonces',
                        methods=['POST'])(self.generate_nonces)
 
-    def run_app(self):
-        node_info = self.nodes_info.lookup_node(self.node_id)
-        self.app.run(host=node_info['host'], port=int(
-            node_info['port']), debug=True, use_reloader=False)
 
     @request_handler
     def round1(self):

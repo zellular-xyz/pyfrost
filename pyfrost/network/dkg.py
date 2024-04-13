@@ -56,7 +56,7 @@ class Dkg:
                 f'DKG id {dkg_id} has FAILED due to insufficient number of available nodes')
             return response
 
-        call_method = '/v1/dkg/round1'
+        call_method = self.nodes_info.prefix + '/v1/dkg/round1'
         request_data = {
             'party': party,
             'dkg_id': dkg_id,
@@ -102,7 +102,7 @@ class Dkg:
             logging.debug(
                 f'Verification of sent data from {node_id}: {verify_result}')
 
-        call_method = '/v1/dkg/round2'
+        call_method = self.nodes_info.prefix + '/v1/dkg/round2'
         request_data = {
             'dkg_id': dkg_id,
             'broadcasted_data': round1_response
@@ -131,7 +131,7 @@ class Dkg:
                 f'DKG request result: {json.dumps(response, indent=4)}')
             return response
 
-        call_method = '/v1/dkg/round3'
+        call_method = self.nodes_info.prefix + '/v1/dkg/round3'
         request_tasks = []
         for node_id in party:
             request_data = {

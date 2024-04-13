@@ -56,7 +56,7 @@ class SA:
         self.default_timeout = default_timeout
 
     async def request_nonces(self, party: List, number_of_nonces: int = 10):
-        call_method = '/v1/generate-nonces'
+        call_method = self.nodes_info.prefix + '/v1/generate-nonces'
         request_data = {
             'number_of_nonces': number_of_nonces,
         }
@@ -74,7 +74,7 @@ class SA:
 
     async def request_signature(self, dkg_key: Dict, nonces_dict: Dict,
                                 sa_data: Dict, sign_party: List) -> Dict:
-        call_method = '/v1/sign'
+        call_method = self.nodes_info.prefix + '/v1/sign'
         if not set(sign_party).issubset(set(dkg_key['party'])):
             response = {
                 'result': 'FAILED',

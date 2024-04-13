@@ -52,6 +52,8 @@ class NodeValidators(Validators):
 
 
 class NodesInfo(BaseNodeInfo):
+    prefix = '/pyfrost'
+
     def __init__(self):
         _, self.nodes = generate_privates_and_nodes_info()
 
