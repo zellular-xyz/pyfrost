@@ -1,34 +1,34 @@
 import os
 import logging
 import sys
+
 from flask import Flask
 from pyfrost.network.node import Node
 from abstracts import NodesInfo, NodeDataManager, NodeValidators
-from config import generate_privates_and_nodes_info
+from pyfrost.zbtc.config import PRIVATE_KEY
 
 
-def run_node(node_number: int) -> None:
+def run_node(node_id: int) -> None:
     data_manager = NodeDataManager()
     nodes_info = NodesInfo()
-    privates, _ = generate_privates_and_nodes_info()
     node = Node(
         data_manager,
-        str(node_number),
-        privates[node_number - 1],
+        str(node_id),
+        PRIVATE_KEY,
         nodes_info,
         NodeValidators.caller_validator,
         NodeValidators.data_validator,
     )
-    node_info = nodes_info.lookup_node(str(node_number))
+    node_info = nodes_info.lookup_node(str(node_id))
     app = Flask(__name__)
     app.register_blueprint(node.blueprint, url_prefix="/pyfrost")
     app.run(host=node_info["host"], port=int(node_info["port"]), debug=True)
 
 
 if __name__ == "__main__":
-    node_number = int(sys.argv[1])
+    node_id = int(sys.argv[1], 16)
     file_path = "logs"
-    file_name = f"node{node_number}.log"
+    file_name = f"node{node_id}.log"
     log_formatter = logging.Formatter(
         "%(asctime)s - %(message)s",
     )
@@ -47,6 +47,6 @@ if __name__ == "__main__":
     sys.set_int_max_str_digits(0)
 
     try:
-        run_node(node_number)
+        run_node(node_id)
     except KeyboardInterrupt:
         pass

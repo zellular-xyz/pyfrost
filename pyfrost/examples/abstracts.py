@@ -1,6 +1,6 @@
 from pyfrost.network.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
 from config import VALIDATED_IPS, generate_privates_and_nodes_info
-from typing import Dict, List
+from typing import Dict
 import hashlib
 import json
 
@@ -42,17 +42,15 @@ class NodeValidators(Validators):
 
     @staticmethod
     def data_validator(input_data: Dict):
-        result = {
-            'data': input_data
-        }
-        hash_obj = hashlib.sha3_256(json.dumps(result['data']).encode())
+        result = {"data": input_data}
+        hash_obj = hashlib.sha3_256(json.dumps(result["data"]).encode())
         hash_hex = hash_obj.hexdigest()
-        result['hash'] = hash_hex
+        result["hash"] = hash_hex
         return result
 
 
 class NodesInfo(BaseNodeInfo):
-    prefix = '/pyfrost'
+    prefix = "/pyfrost"
 
     def __init__(self):
         _, self.nodes = generate_privates_and_nodes_info()

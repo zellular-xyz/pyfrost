@@ -32,7 +32,7 @@ async def run_sample(
 
     # Requesting DKG:
     now = timeit.default_timer()
-    dkg_key = await dkg.request_dkg(threshold, party)
+    dkg_key = await dkg.request_dkg(threshold, party, key_type="BTC")
     then = timeit.default_timer()
 
     logging.info(f"Requesting DKG takes: {then - now} seconds.")

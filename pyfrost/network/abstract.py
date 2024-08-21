@@ -16,7 +16,7 @@ class DataManager(ABC):
         pass
 
     @abstractmethod
-    def set_key(self,  key, value) -> None:
+    def set_key(self, key, value) -> None:
         pass
 
     @abstractmethod
