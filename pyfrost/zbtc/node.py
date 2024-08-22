@@ -9,7 +9,10 @@ from pyfrost.zbtc.config import PRIVATE_KEY
 
 
 def run_node(node_id: int) -> None:
-    data_manager = NodeDataManager()
+    data_manager = NodeDataManager(
+        f"./pyfrost/zbtc/data/dkg_keys-{node_id}.json",
+        f"./pyfrost/zbtc/data/nonces-{node_id}.json",
+    )
     nodes_info = NodesInfo()
     node = Node(
         data_manager,

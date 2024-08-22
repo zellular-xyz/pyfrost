@@ -178,6 +178,7 @@ class Dkg:
             "public_shares": public_shares,
             "party": party,
             "validations": validations,
+            "key_type": key_type,
             "result": "SUCCESSFUL",
         }
         logging.info(f"DKG response: {response}")

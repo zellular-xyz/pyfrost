@@ -38,9 +38,9 @@ async def sign_request(url: str, dkg_key: Dict, data: Dict, timeout: int = 10):
                     "group_key": dkg_key["public_key"],
                     "key_type": sign["key_type"],
                 }
-                res = pyfrost.verify_single_signature(signature_data)
-                if not res:
-                    result["status"] = "MALICIOUS"
+                # res = pyfrost.verify_single_signature(signature_data)
+                # if not res:
+                #     result["status"] = "MALICIOUS"
                 return result
             except asyncio.TimeoutError:
                 return {
@@ -112,6 +112,7 @@ class SA:
         signs = []
         aggregated_public_nonces = []
         str_message = None
+        key_type = None
         for node_id, data in signatures.items():
             assert data["status"] != "ERROR", f"node_id: {node_id}, data: {data}"
             _hash = data.get("hash")
@@ -126,6 +127,11 @@ class SA:
                 signs.append(_signature_data)
             if _aggregated_public_nonce:
                 aggregated_public_nonces.append(_aggregated_public_nonce)
+            if key_type:
+                assert key_type == _signature_data.get(
+                    "key_type"
+                ), f"node_id: {node_id}, key type is different: {data}"
+            key_type = _signature_data.get("key_type")
 
         response = {"result": "SUCCESSFUL", "signatures": None}
         if not len(set(aggregated_public_nonces)) == 1:
@@ -155,7 +161,11 @@ class SA:
         )
 
         aggregated_sign = pyfrost.aggregate_signatures(
-            str_message, signs, aggregated_public_nonce, dkg_key["public_key"]
+            str_message,
+            signs,
+            aggregated_public_nonce,
+            dkg_key["public_key"],
+            key_type=key_type,
         )
         if pyfrost.frost.verify_group_signature(aggregated_sign):
             aggregated_sign["message_hash"] = str_message

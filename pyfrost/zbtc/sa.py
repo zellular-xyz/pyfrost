@@ -1,3 +1,11 @@
+import json
+
+from bitcoinutils.keys import PublicKey
+from bitcoinutils.utils import to_satoshis
+
+from pyfrost.btc_transaction_utils import (
+    get_taproot_address,
+)
 from pyfrost.network.sa import SA
 from pyfrost.network.dkg import Dkg
 from typing import List
@@ -9,6 +17,8 @@ import sys
 import os
 import random
 import asyncio
+
+
 # TODO: Merge examples with libp2p.
 
 
@@ -31,8 +41,15 @@ async def run_sample(
     party = random.sample(all_nodes, n)
 
     # Requesting DKG:
+    file_path = "dkg.json"
     now = timeit.default_timer()
-    dkg_key = await dkg.request_dkg(threshold, party, key_type="BTC")
+    if os.path.exists(file_path):
+        with open(file_path, "r") as file:
+            dkg_key = json.load(file)
+    else:
+        dkg_key = await dkg.request_dkg(threshold, party, key_type="BTC")
+        with open("pyfrost/zbtc/dkg.json", "w") as file:
+            json.dump(dkg_key, file)
     then = timeit.default_timer()
 
     logging.info(f"Requesting DKG takes: {then - now} seconds.")
@@ -51,16 +68,46 @@ async def run_sample(
             nonce = nonces[node_id].pop()
             nonces_dict[node_id] = nonce
 
-        now = timeit.default_timer()
-        sa_data = {"data": "Hi there!"}
+        from_address = get_taproot_address(dkg_public_key).to_string()
+        fee_amount = to_satoshis(0.00000010)
+        send_amount = to_satoshis(0.00000020)
+        to_address = PublicKey(
+            "03ffac5f6f2f5723ee1ed1f42827cc5bef641f8b79cbddf768f031744748739972"
+        )
+        to_address = to_address.get_segwit_address().to_string()
+        logging.info(
+            f"Initiate transfer {send_amount} satoshi from {from_address} to {to_address}. fee: {fee_amount} satoshi"
+        )
 
-        signature = await sa.request_signature(
+        sa_data = {"data": "hi"}
+        # utxos = get_utxos(from_address, fee_amount + send_amount)
+        # tx, tx_digest = get_withdraw_tx(
+        #     from_address,
+        #     utxos,
+        #     to_address,
+        #     send_amount,
+        #     fee_amount,
+        #     "f5ba44e5b6f6df3fd4d939184597938935814e7bf7cb75fe8efcf1274a5f70de",
+        #     0,
+        # )
+        # tx_digest = tx_digest.hex()
+        now = timeit.default_timer()
+
+        group_sign = await sa.request_signature(
             dkg_key, nonces_dict, sa_data, dkg_key["party"]
         )
         then = timeit.default_timer()
 
         logging.info(f"Requesting signature {i} takes {then - now} seconds")
-        logging.info(f"Signature data: {signature}")
+        logging.info(f"Signature data: {group_sign}")
+
+        # sig = bytes_from_int(int(group_sign["public_nonce"]["x"], 16)) + bytes_from_int(
+        #     group_sign["signature"]
+        # )
+        # tx.witnesses.append(TxWitnessInput([sig.hex()]))
+        # raw_tx = tx.serialize()
+        # resp = broadcast_tx(raw_tx)
+        # logging.info(f"Transaction Info: {json.dumps(resp.json(), indent=4)}")
 
 
 if __name__ == "__main__":

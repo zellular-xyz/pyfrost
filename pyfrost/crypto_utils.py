@@ -54,7 +54,7 @@ class Polynomial:
         # If an initial coefficient is provided, convert it to an integer from a hex string if necessary
         # and add it as the first coefficient of the polynomial.
         if coefficient0 is not None:
-            if type(coefficient0) == str:
+            if coefficient0 is str:
                 coefficient0 = int(coefficient0, 16)
             self.coefficients.append(coefficient0)
 
@@ -76,7 +76,7 @@ class Polynomial:
         """
         result = 0
         # Convert x to an integer if it is provided as a string.
-        if type(x) == str:
+        if x is str:
             x = int(x)
 
         # Evaluate the polynomial using Horner's method for efficiency.
@@ -182,7 +182,7 @@ def generate_random_private() -> int:
     return keys.gen_private_key(ecurve)
 
 
-def langrange_coef(index: int, threshold: int, shares: List[Dict], x: int) -> int:
+def lagrange_coef(index: int, threshold: int, shares: List[Dict], x: int) -> int:
     x_j = int(shares[index]["id"])
     nums = []
     denums = []
@@ -199,7 +199,7 @@ def reconstruct_share(shares: List[Dict], threshold: int, x: int) -> int:
     assert len(shares) == threshold, "Number of shares must be t."
     sum = 0
     for j in range(threshold):
-        coef = langrange_coef(j, threshold, shares, x)
+        coef = lagrange_coef(j, threshold, shares, x)
         key = shares[j]["key"]
         sum = (sum + (key * coef % N)) % N
     return sum % N
@@ -236,9 +236,9 @@ def split_signature(string_signature: str) -> Dict[str, int]:
 
 
 def schnorr_verify(public_key: Point, message: str, signature: str) -> bool:
-    if type(signature) == str:
+    if signature is str:
         signature = split_signature(signature)
-    if type(message) != int:
+    if message is not int:
         message = int(message)
     assert signature["s"] < N, "Signature must be reduced modulo N"
     r_v = (signature["s"] * ecurve.G) + (signature["e"] * public_key)
@@ -253,7 +253,7 @@ def schnorr_aggregate_signatures(
     aggregated_signature = 0
 
     for j in range(threshold):
-        coef = langrange_coef(j, threshold, [{"id": i} for i in party], 0)
+        coef = lagrange_coef(j, threshold, [{"id": i} for i in party], 0)
         aggregated_signature += signatures[j]["s"] * coef
     s = aggregated_signature % N
     e = signatures[0]["e"]
@@ -301,14 +301,6 @@ def generate_hkdf_key(key: int) -> bytes:
         backend=default_backend(),
     )
     return hkdf.derive(bytes.fromhex(str(key)))
-
-
-def encrypt(data: str, key: bytes) -> str:
-    if type(data) != str:
-        data = json.dumps(data)
-    key = base64.b64encode(key)
-    fernet = Fernet(key)
-    return fernet.encrypt(data.encode()).decode(encoding="utf-8")
 
 
 def decrypt(data: str, key: bytes) -> str:

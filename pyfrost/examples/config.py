@@ -29,7 +29,6 @@ def generate_privates_and_nodes_info(number: int = 100):
         compressed_pub_key = int(
             SEC1Encoder.encode_public_key(public_key, True).hex(), 16
         )
-        print(compressed_pub_key)
         nodes_info_dict[str(i + 1)] = {
             "public_key": compressed_pub_key,
             "host": "127.0.0.1",
@@ -37,6 +36,3 @@ def generate_privates_and_nodes_info(number: int = 100):
         }
         privates_list.append(new_private)
     return privates_list, nodes_info_dict
-
-
-print(generate_privates_and_nodes_info(5))

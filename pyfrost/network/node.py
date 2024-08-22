@@ -79,7 +79,6 @@ class Node:
         dkg_id = data["dkg_id"]
         threshold = data["threshold"]
         key_type = data["key_type"]
-
         assert (
             self.node_id in party
         ), f"This node is not amoung specified party for app {dkg_id}"
@@ -88,7 +87,6 @@ class Node:
         self.key_gens[dkg_id] = KeyGen(
             dkg_id, threshold, self.node_id, partners, key_type=key_type
         )
-
         round1_broadcast_data = self.key_gens[dkg_id].round1()
 
         broadcast_bytes = json.dumps(round1_broadcast_data, sort_keys=True).encode(
@@ -106,7 +104,6 @@ class Node:
         data = request.get_json()
         dkg_id = data["dkg_id"]
         whole_broadcasted_data: Dict = data.get("broadcasted_data")
-
         broadcasted_data = []
         for node_id, data in whole_broadcasted_data.items():
             # TODO: error handling (if verification failed)
@@ -121,7 +118,6 @@ class Node:
             )
             logging.debug(f"Verification of sent data from {node_id}: {verify_result}")
             broadcasted_data.append(data["broadcast"])
-
         round2_broadcast_data = self.key_gens[dkg_id].round2(broadcasted_data)
         result = {
             "broadcast": round2_broadcast_data,
@@ -147,12 +143,10 @@ class Node:
                 sign_data, self.private, curve.secp256k1
             )
             round3_data["dkg_key_pair"]["key_type"] = self.key_gens[dkg_id].key_type
-            print("here1", round3_data["dkg_key_pair"])
             self.data_manager.set_key(
                 str(round3_data["dkg_key_pair"]["dkg_public_key"]),
                 round3_data["dkg_key_pair"],
             )
-            print("here2")
 
         result = {
             "data": round3_data["data"],
@@ -171,7 +165,7 @@ class Node:
         result = self.data_validator(sa_data)
         key_pair = self.data_manager.get_key(str(dkg_public_key))
         # TODO: Must remove
-        if type(key_pair["dkg_public_key"]) == Point:
+        if key_pair["dkg_public_key"] is Point:
             comp_pub = SEC1Encoder.encode_public_key(key_pair["dkg_public_key"], True)
             key_pair["dkg_public_key"] = int(comp_pub.hex(), 16)
         key = Key(key_pair, self.node_id)

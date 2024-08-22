@@ -1,6 +1,30 @@
 from fastecdsa import keys
 from hashlib import sha256
-from .crypto_utils import *
+from .crypto_utils import (
+    pub_to_code,
+    ecurve,
+    schnorr_sign,
+    stringify_signature,
+    Polynomial,
+    schnorr_verify,
+    code_to_pub,
+    generate_hkdf_key,
+    encrypt,
+    decrypt,
+    calc_poly_point,
+    pub_compress,
+    pub_to_addr,
+    lagrange_coef,
+    calculate_tweak,
+    bytes_from_int,
+    taproot_tweak_pubkey,
+    int_from_bytes,
+    tagged_hash,
+    generate_random_private,
+    N,
+    pub_decompress,
+    complaint_sign,
+)
 from typing import List, Dict, Tuple
 import json
 from fastecdsa.point import Point
@@ -81,33 +105,27 @@ class KeyGen:
 
     def round2(self, round1_broadcasted_data) -> List[Dict]:
         self.round1_broadcasted_data = round1_broadcasted_data
-
         fx: Polynomial = self.fx
         self.partners_public_keys = {}
         secret_key = self.secret_key
         for data in round1_broadcasted_data:
             sender_id = data["sender_id"]
-
             if sender_id == self.node_id:
                 continue
-
             sender_public_fx = data["public_fx"]
             sender_coef0_nonce = data["coefficient0_signature"]["nonce"]
             sender_coef0_signature = data["coefficient0_signature"]["signature"]
-
             coef0_pop_hash = sha256(
                 sender_id.encode()
                 + self.dkg_id.encode()
                 + sender_public_fx[0].to_bytes(33, "big")
                 + sender_coef0_nonce.to_bytes(33, "big")
             ).digest()
-
             coef0_verification = schnorr_verify(
                 code_to_pub(sender_public_fx[0]),
                 int.from_bytes(coef0_pop_hash, "big"),
                 sender_coef0_signature,
             )
-
             sender_public_key = data["public_key"]
             sender_public_nonce = data["secret_signature"]["nonce"]
             sender_secret_signature = data["secret_signature"]["signature"]
@@ -130,12 +148,12 @@ class KeyGen:
                 # TODO: how to handle complaint
                 self.malicious.append({"id": sender_id, "complaint": data})
             self.partners_public_keys[sender_id] = sender_public_key
-
         qualified = self.partners
         for node in self.malicious:
             try:
                 qualified.remove(node["id"])
             except:
+                # TODO: Raise error or something
                 pass
         result_data = []
         for id in qualified:
@@ -152,7 +170,6 @@ class KeyGen:
                 ),
             }
             result_data.append(data)
-
         self.status = "ROUND2"
         return result_data
 
@@ -235,7 +252,6 @@ class Key:
             self.dkg_key_pair["dkg_public_key"]
         )
         self.node_id = node_id
-        print("11111", self.dkg_key_pair)
         self.key_type = self.dkg_key_pair["key_type"]
 
     def sign(self, nonces_dict: Dict, message: str, nonce_pair: Dict) -> Dict:
@@ -307,7 +323,7 @@ def single_sign(
         ).digest()
 
         # Calculate signature share
-        coef = langrange_coef(index, len(nonces_list), nonces_list, 0)
+        coef = lagrange_coef(index, len(nonces_list), nonces_list, 0)
         signature_share = (
             nonce_d
             + nonce_e * int.from_bytes(my_row, "big")
@@ -319,28 +335,24 @@ def single_sign(
         tweaked_pubkey_has_even_y, tweaked_pubkey = taproot_tweak_pubkey(
             bytes_from_int(int(group_key_pub["x"], 16)), b""
         )
-
-        P = tweaked_pubkey
         if not tweaked_pubkey_has_even_y:
             tweaked_share = ecurve.q - tweaked_share
 
         k0 = (nonce_d + nonce_e * int.from_bytes(my_row, "big")) % ecurve.q
-
-        R = aggregated_public_nonce
         k = ecurve.q - k0 if aggregated_public_nonce.y % 2 == 1 else k0
-
         challenge = (
             int_from_bytes(
                 tagged_hash(
                     "BIP0340/challenge",
-                    bytes_from_int(R.x) + P + message_bytes,
+                    bytes_from_int(aggregated_public_nonce.x)
+                    + tweaked_pubkey
+                    + message_bytes,
                 )
             )
             % ecurve.q
         )
-
         # Calculate signature share
-        coef = langrange_coef(index, len(nonces_list), nonces_list, 0) % ecurve.q
+        coef = lagrange_coef(index, len(nonces_list), nonces_list, 0) % ecurve.q
         signature_share = (k + coef * tweaked_share * challenge) % ecurve.q
 
     return {
@@ -388,7 +400,6 @@ def verify_single_signature(signature_data: Dict) -> bool:
     nonces_dict = list(signature_data["nonces_dict"].values())
     nonces_hash = sha256(json.dumps(nonces_dict).encode()).digest()
     message_bytes = signature_data["message"].encode("utf-8")
-    print("signatur data", signature_data)
 
     # Find the relevant nonce and calculate the public nonce
     public_nonce, index = None, 0
@@ -436,7 +447,7 @@ def verify_single_signature(signature_data: Dict) -> bool:
         )
 
     # Calculate coefficients and points
-    coef = langrange_coef(index, len(nonces_dict), nonces_dict, 0)
+    coef = lagrange_coef(index, len(nonces_dict), nonces_dict, 0)
     point1 = public_nonce - (
         challenge * coef * code_to_pub(signature_data["public_key_share"])
     )
@@ -484,6 +495,7 @@ def aggregate_signatures(
     single_signatures: List[Dict[str, int]],
     aggregated_public_nonce: Point,
     group_key: int,
+    key_type: str = "ETH",
 ) -> Dict:
     # Calculate message bytes
     message_bytes = message.encode("utf-8")
@@ -493,26 +505,48 @@ def aggregate_signatures(
 
     return {
         "nonce": pub_to_addr(aggregated_public_nonce),
+        "public_nonce": pub_compress(aggregated_public_nonce),
         "public_key": pub_compress(code_to_pub(group_key)),
         "signature": aggregated_signature,
         "message_bytes": message_bytes,
+        "key_type": key_type,
     }
 
 
 def verify_group_signature(aggregated_signature: Dict) -> bool:
     # Calculate the challenge
-    challenge = sha256(
-        bytes.fromhex(aggregated_signature["public_key"]["x"].replace("0x", ""))
-        + aggregated_signature["public_key"]["y_parity"].to_bytes(1, "big")
-        + aggregated_signature["message_bytes"]
-        + bytes.fromhex(aggregated_signature["nonce"].replace("0x", ""))
-    ).digest()
-
-    # Calculate the point
-    challenge_int = int.from_bytes(challenge, "big")
-    point = (aggregated_signature["signature"] * ecurve.G) + (
-        challenge_int * pub_decompress(aggregated_signature["public_key"])
-    )
+    if aggregated_signature["key_type"] == "ETH":
+        challenge = sha256(
+            bytes.fromhex(aggregated_signature["public_key"]["x"].replace("0x", ""))
+            + aggregated_signature["public_key"]["y_parity"].to_bytes(1, "big")
+            + aggregated_signature["message_bytes"]
+            + bytes.fromhex(aggregated_signature["nonce"].replace("0x", ""))
+        ).digest()
+        challenge_int = int.from_bytes(challenge, "big")
+        # Calculate the point
+        point = (aggregated_signature["signature"] * ecurve.G) + (
+            challenge_int * pub_decompress(aggregated_signature["public_key"])
+        )
+    elif aggregated_signature["key_type"] == "BTC":
+        tweaked_pubkey_has_even_y, tweaked_pubkey = taproot_tweak_pubkey(
+            bytes.fromhex(aggregated_signature["public_key"]["x"].replace("0x", "")),
+            b"",
+        )
+        P = tweaked_pubkey
+        R = pub_decompress(aggregated_signature["public_nonce"])
+        challenge_int = (
+            int_from_bytes(
+                tagged_hash(
+                    "BIP0340/challenge",
+                    bytes_from_int(R.x) + P + aggregated_signature["message_bytes"],
+                )
+            )
+            % ecurve.q
+        )
+        # Calculate the point
+        point = (aggregated_signature["signature"] * ecurve.G) + (
+            challenge_int * pub_decompress(aggregated_signature["public_key"])
+        )
 
     # Verify the nonce
     return aggregated_signature["nonce"] == pub_to_addr(point)

@@ -75,7 +75,6 @@ class Test(unittest.TestCase):
             threshold = 3
             number_of_nodes = 5
             share_key = share_keys(private, threshold, number_of_nodes, [], [])
-            f = share_key["polynomial"]
             shares = share_key["shares"]
             threshold_shares1 = random.sample(shares, threshold)
             generated_key1 = Utils.reconstruct_share(threshold_shares1, threshold, 0)
