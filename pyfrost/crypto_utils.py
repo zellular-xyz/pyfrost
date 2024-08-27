@@ -423,7 +423,7 @@ def bytes_from_int(x: int) -> bytes:
     return x.to_bytes(32, byteorder="big")
 
 
-def has_even_y(P: Point) -> bool:
+def is_y_even(P: Point) -> bool:
     return P.y % 2 == 0
 
 
@@ -456,7 +456,7 @@ def taproot_tweak_pubkey(pubkey, h) -> tuple[bool, int]:
     if P is None:
         raise ValueError
     Q = P + ecurve.G * t
-    return has_even_y(Q), bytes_from_int(Q.x)
+    return is_y_even(Q), bytes_from_int(Q.x)
 
 
 def mod_inverse(number: int, modulus: int) -> int:
@@ -551,7 +551,6 @@ def reconstruct_share(shares: list[dict], threshold: int, x: int) -> int:
     sum = 0
     for j in range(threshold):
         coef = lagrange_coef(j, threshold, shares, x) % ecurve.q
-        print(j, threshold, shares, x, coef)
         key = shares[j]["key"]
         sum = (sum + (key * coef % N)) % N
     return sum % N

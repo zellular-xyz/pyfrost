@@ -31,7 +31,8 @@ def request_handler(func):
             return jsonify(result), 200
         except Exception as e:
             logging.error(
-                f"Flask round1 handler => Exception occurred: {type(e).__name__}: {e}"
+                f"Flask round1 handler => Exception occurred: {type(e).__name__}: {e}",
+                exc_info=True,  # This will include the stack trace in the log
             )
             return jsonify(
                 {"error": f"{type(e).__name__}: {e}", "status": "ERROR"}
@@ -165,7 +166,7 @@ class Node:
         result = self.data_validator(sa_data)
         key_pair = self.data_manager.get_key(str(dkg_public_key))
         # TODO: Must remove
-        if key_pair["dkg_public_key"] is Point:
+        if isinstance(key_pair["dkg_public_key"], Point):
             comp_pub = SEC1Encoder.encode_public_key(key_pair["dkg_public_key"], True)
             key_pair["dkg_public_key"] = int(comp_pub.hex(), 16)
         key = Key(key_pair, self.node_id)
@@ -177,8 +178,8 @@ class Node:
         nonce_e_private = self.data_manager.get_nonce(str(nonce_e_public))
         nonce = {"nonce_d": nonce_d_private, "nonce_e": nonce_e_private}
         result["signature_data"] = key.sign(nonces_dict, result["hash"], nonce)
-        self.data_manager.remove_nonce(str(nonce_d_public))
-        self.data_manager.remove_nonce(str(nonce_e_public))
+        # self.data_manager.remove_nonce(str(nonce_d_public))
+        # self.data_manager.remove_nonce(str(nonce_e_public))
 
         result["status"] = "SUCCESSFUL"
         result["request_id"] = request_id

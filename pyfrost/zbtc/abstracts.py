@@ -1,9 +1,19 @@
+import logging
 import threading
 import time
 from urllib.parse import urlparse
 
+from bitcoinutils.keys import PublicKey
+from web3 import Web3
+
+from pyfrost.btc_transaction_utils import (
+    get_utxos,
+    get_simple_withdraw_tx,
+    get_burned,
+    get_deposit,
+)
 from pyfrost.network.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
-from config import VALIDATED_IPS
+from config import VALIDATED_IPS, ZBTC_ADDRESS, MPC_ADDRESS
 from typing import Dict
 import hashlib
 
@@ -33,16 +43,18 @@ class NodeDataManager(DataManager):
 
     def _save_data(self, file_path, data):
         with open(file_path, "w") as file:
-            json.dump(data, file)
+            json.dump(data, file, indent=4)
 
     def set_nonce(self, nonce_public: str, nonce_private: str) -> None:
         self.__nonces[nonce_public] = nonce_private
         self._save_data(self.nonces_file, self.__nonces)
 
     def get_nonce(self, nonce_public: str):
-        return self.__nonces.get(nonce_public)
+        data = self._load_data(self.nonces_file)
+        return data.get(nonce_public)
 
     def remove_nonce(self, nonce_public: str) -> None:
+        self.__nonces = self._load_data(self.nonces_file)
         if nonce_public in self.__nonces:
             del self.__nonces[nonce_public]
             self._save_data(self.nonces_file, self.__nonces)
@@ -52,9 +64,11 @@ class NodeDataManager(DataManager):
         self._save_data(self.dkg_keys_file, self.__dkg_keys)
 
     def get_key(self, key):
-        return self.__dkg_keys.get(key, {})
+        data = self._load_data(self.dkg_keys_file)
+        return data.get(key, {})
 
     def remove_key(self, key):
+        self.__dkg_keys = self._load_data(self.dkg_keys_file)
         if key in self.__dkg_keys:
             del self.__dkg_keys[key]
             self._save_data(self.dkg_keys_file, self.__dkg_keys)
@@ -72,11 +86,89 @@ class NodeValidators(Validators):
 
     @staticmethod
     def data_validator(input_data: Dict):
-        result = {"data": input_data}
-        hash_obj = hashlib.sha3_256(json.dumps(result["data"]).encode())
-        hash_hex = hash_obj.hexdigest()
-        result["hash"] = hash_hex
-        return result
+        method = input_data["method"]
+        data = input_data["data"]
+        if method == "get_simple_withdraw_tx":
+            from_address = data["from"]
+            to_address = data["to"]
+            fee = data["fee"]
+            tx_digest = bytes.fromhex(data["hash"])
+            send_amount = data["send_amount"]
+            utxos = get_utxos(from_address, fee + send_amount)
+            tx, tx_digests = get_simple_withdraw_tx(
+                from_address, utxos, to_address, send_amount, fee
+            )
+            if tx_digest in tx_digests:
+                result = {
+                    "data": input_data,
+                    "hash": tx_digest.hex(),
+                }
+                return result
+            else:
+                raise ValueError(f"Invalid Data: {input_data}")
+
+        elif method == "get_withdraw_tx":
+            rpc_url = "https://ethereum-holesky-rpc.publicnode.com"
+            web3 = Web3(Web3.HTTPProvider(rpc_url))
+
+            burn_tx_hash = data["burn_tx_hash"]
+            tx_digest = bytes.fromhex(data["hash"])
+            fee = data["fee"]
+
+            burned = get_burned(burn_tx_hash, web3, ZBTC_ADDRESS)
+            send_amount = burned["amount"]
+            single_spend_txid = burned["singleSpendTx"]
+            single_spend_vout = 0
+            to_address = burned["bitcoinAddress"]
+            to_address = PublicKey(to_address)
+            to_address = to_address.get_segwit_address().to_string()
+
+            utxos = get_utxos(MPC_ADDRESS, fee + send_amount)
+            tx, tx_digests = get_simple_withdraw_tx(
+                MPC_ADDRESS,
+                utxos,
+                to_address,
+                send_amount,
+                fee,
+                single_spend_txid,
+                single_spend_vout,
+            )
+            if tx_digest in tx_digests:
+                result = {
+                    "data": input_data,
+                    "hash": tx_digest.hex(),
+                }
+                print("verified")
+                return result
+            else:
+                raise ValueError(f"Invalid Data: {input_data}")
+
+        elif method == "mint":
+            tx_hash = data["tx_hash"]
+            public_key_hex = data["public_key_hex"]
+            message_hash = data["hash"]
+
+            deposit = get_deposit(tx_hash, public_key_hex)
+            msg = Web3.solidity_keccak(
+                ["uint256", "uint256", "address"],
+                [
+                    int(deposit["tx"], 16),
+                    deposit["amount"],
+                    Web3.to_checksum_address(deposit["eth_address"]),
+                ],
+            )
+            if msg == message_hash:
+                result = {
+                    "data": input_data,
+                    "hash": msg,
+                }
+                print("verified")
+                return result
+            else:
+                raise ValueError(f"Invalid Data: {input_data}")
+
+        else:
+            raise NotImplementedError()
 
 
 class NodesInfo(BaseNodeInfo):

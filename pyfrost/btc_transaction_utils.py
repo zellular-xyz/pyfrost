@@ -11,6 +11,9 @@ from bitcoinutils.setup import setup
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
 import pyfrost.frost as frost
 from pyfrost.crypto_utils import code_to_pub, pub_to_code
+from pyfrost.zbtc.config import BASE_URL, BTC_NETWORK
+
+setup(BTC_NETWORK)
 
 
 def get_burned(tx_hash, web3, contract_address):
@@ -58,40 +61,6 @@ def get_taproot_address(public_key):
     return taproot_address
 
 
-def dkg(dkg_id, t, n, party):
-    assert len(party) == n, f"party length does not match n: {n}!={len(party)}"
-    base_coef0 = (
-        76622783108274780747756398270842445905196011304614807988789919767093500641526
-    )
-    coef0 = [base_coef0 + i for i in range(n)]
-
-    keys: list[frost.KeyGen] = []
-    sign_keys: list[frost.Key] = []
-
-    for coef0, node_id in zip(coef0, party):
-        partners = party.copy()
-        partners.remove(node_id)
-        keys.append(frost.KeyGen(dkg_id, t, n, node_id, partners, coef0))
-
-    round1_received_data = []
-    for key in keys:
-        round1_send_data = key.round1()
-        round1_received_data.append(round1_send_data)
-    round2_received_data = {}
-    for node_id in party:
-        round2_received_data[node_id] = []
-    for key in keys:
-        round2_send_data = key.round2(round1_received_data)
-        for message in round2_send_data:
-            round2_received_data[message["receiver_id"]].append(message)
-    dkg_keys = set()
-    for key in keys:
-        result = key.round3(round2_received_data[key.node_id])
-        dkg_keys.add(result["data"]["dkg_public_key"])
-        sign_keys.append(frost.Key(key.dkg_key_pair, key.node_id))
-    return sign_keys
-
-
 def get_nonces(party):
     nonces = {"common_data": {}, "private_data": {}}
     for node_id in party:
@@ -99,31 +68,6 @@ def get_nonces(party):
         nonces["common_data"][node_id] = nonces_common_data
         nonces["private_data"][node_id] = nonces_private_data
     return nonces
-
-
-def sign(sign_keys, nonces, t, msg):
-    sign_subset = random.sample(sign_keys, t)
-    signs = []
-    agregated_nonces = []
-    first_nonces = {
-        key.node_id: nonces["common_data"][key.node_id][0] for key in sign_subset
-    }
-    for key in sign_subset:
-        single_sign, remove_data = key.sign(
-            first_nonces,
-            msg,
-            nonces["private_data"][key.node_id],
-        )
-        # saved_data["private_data"][key.node_id]["nonces"].remove(remove_data)
-        agregated_nonces.append(single_sign["aggregated_public_nonce"])
-        signs.append(single_sign)
-    group_sign = frost.aggregate_signatures(
-        msg,
-        signs,
-        agregated_nonces[0],
-        pub_to_code(sign_subset[0].dkg_key_pair["dkg_public_key"]),
-    )
-    return group_sign
 
 
 def get_withdraw_tx(
@@ -135,16 +79,13 @@ def get_withdraw_tx(
     single_spend_txid,
     single_spend_vout,
 ):
-    setup("testnet")
-
     from_address = P2trAddress(from_address)
     first_script_pubkey = from_address.to_script_pub_key()
-    utxos_script_pubkeys = [first_script_pubkey]
+    utxos_script_pubkeys = [first_script_pubkey] * len(utxos)
     to_address = P2wpkhAddress(to_address)
 
-    txins = [TxInput(utxo["tx_hash"], utxo["tx_output_n"]) for utxo in utxos]
+    txins = [TxInput(utxo["txid"], utxo["vout"]) for utxo in utxos]
     amounts = [utxo["value"] for utxo in utxos]
-
     txins.append(TxInput(single_spend_txid, single_spend_vout))
     amounts.append(1)
 
@@ -156,16 +97,45 @@ def get_withdraw_tx(
     )
 
     tx = Transaction(txins, [txout1, txout2], has_segwit=True)
-    tx_digest = tx.get_transaction_taproot_digest(
-        0, utxos_script_pubkeys, amounts, 0, sighash=TAPROOT_SIGHASH_ALL
+    tx_digests = [
+        tx.get_transaction_taproot_digest(
+            i, utxos_script_pubkeys, amounts, 0, sighash=TAPROOT_SIGHASH_ALL
+        )
+        for i in range(len(utxos))
+    ]
+    return tx, tx_digests
+
+
+def get_simple_withdraw_tx(from_address, utxos, to_address, send_amount, fee_amount):
+    from_address = P2trAddress(from_address)
+    first_script_pubkey = from_address.to_script_pub_key()
+    utxos_script_pubkeys = [first_script_pubkey] * len(utxos)
+    to_address = P2wpkhAddress(to_address)
+
+    txins = [TxInput(utxo["txid"], utxo["vout"]) for utxo in utxos]
+    amounts = [utxo["value"] for utxo in utxos]
+
+    first_amount = sum(amounts)
+
+    txout1 = TxOutput(send_amount, to_address.to_script_pub_key())
+    txout2 = TxOutput(
+        first_amount - send_amount - fee_amount, from_address.to_script_pub_key()
     )
-    return tx, tx_digest
+
+    tx = Transaction(txins, [txout1, txout2], has_segwit=True)
+    tx_digests = [
+        tx.get_transaction_taproot_digest(
+            i, utxos_script_pubkeys, amounts, 0, sighash=TAPROOT_SIGHASH_ALL
+        )
+        for i in range(len(utxos))
+    ]
+    return tx, tx_digests
 
 
 def get_utxos(bitcoin_address, desired_amount):
-    url = f"https://api.blockcypher.com/v1/btc/test3/addrs/{bitcoin_address}?unspentOnly=true"
+    url = f"{BASE_URL}/address/{bitcoin_address}/utxo"
     response = requests.get(url)
-    utxos = response.json().get("txrefs", [])
+    utxos = response.json()
     total_value = 0
     selected_utxos = []
     for utxo in utxos:
@@ -183,7 +153,7 @@ def get_deposit(tx_hash, public_key_hex, mpc_wallet):
     # todo: other types of bitcoin addresses should be implemented
     bitcoin_address = public_key.get_segwit_address().to_string()
 
-    url = f"https://api.blockcypher.com/v1/btc/test3/txs/{tx_hash}"
+    url = f"{BASE_URL}/txs/{tx_hash}"
     tx = requests.get(url).json()
     assert tx["confirmations"] >= 1, "tx does not have enough confirmations"
     outputs = tx["outputs"]
@@ -201,9 +171,6 @@ def get_deposit(tx_hash, public_key_hex, mpc_wallet):
     )
     assert validated, f"{eth_address} is not valid eth address"
 
-    print("Source Bitcoin Address:", bitcoin_address)
-    print("Amount:", amount)
-    print("Dest ETH Address:", eth_address)
     return {
         "tx": tx["hash"],
         "amount": amount,

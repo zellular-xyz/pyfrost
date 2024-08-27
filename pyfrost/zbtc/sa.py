@@ -1,33 +1,55 @@
 import json
+import sys
 
 from bitcoinutils.keys import PublicKey
+from bitcoinutils.setup import setup
+from bitcoinutils.transactions import TxWitnessInput
 from bitcoinutils.utils import to_satoshis
+from flask import Flask, request, jsonify
+from web3 import Web3
 
 from pyfrost.btc_transaction_utils import (
     get_taproot_address,
+    broadcast_tx,
+    get_utxos,
+    get_withdraw_tx,
+    get_simple_withdraw_tx,
+    get_deposit,
+    get_burned,
 )
+from pyfrost.crypto_utils import bytes_from_int
 from pyfrost.network.sa import SA
-from pyfrost.network.dkg import Dkg
-from typing import List
 from abstracts import NodesInfo
 import logging
-import time
-import timeit
-import sys
 import os
-import random
 import asyncio
 
+from pyfrost.zbtc.config import FEE_AMOUNT, BTC_NETWORK, ZBTC_ADDRESS
 
-# TODO: Merge examples with libp2p.
+setup(BTC_NETWORK)
+
+app = Flask(__name__)
+rpc_url = "https://ethereum-holesky-rpc.publicnode.com"
+web3 = Web3(Web3.HTTPProvider(rpc_url))
+
+mpc_dkg_key = None
+eth_dkg_key = None
+mpc_address = None
+mpc_public_key = None
+eth_public_key = None
+nonces = {}
 
 
-async def run_sample(
-    total_node_number: int, threshold: int, n: int, num_signs: int
-) -> None:
+async def initialization(total_node_number: int) -> None:
+    global mpc_dkg_key
+    global eth_dkg_key
+    global mpc_address
+    global mpc_public_key
+    global eth_public_key
+    global nonces
+
     nodes_info = NodesInfo()
     all_nodes = nodes_info.get_all_nodes(total_node_number)
-    dkg = Dkg(nodes_info, default_timeout=50)
     sa = SA(nodes_info, default_timeout=50)
     nonces = {}
     nonces_response = await sa.request_nonces(all_nodes)
@@ -35,82 +57,192 @@ async def run_sample(
         nonces.setdefault(node_id, [])
         nonces[node_id] += nonces_response[node_id]["data"]
 
-    # Random party selection:
-    seed = int(time.time())
-    random.seed(seed)
-    party = random.sample(all_nodes, n)
+    # Retrieving DKGs:
+    dkg_file_path = "pyfrost/zbtc/dkgs.json"
+    with open(dkg_file_path, "r") as file:
+        data = json.load(file)
 
-    # Requesting DKG:
-    file_path = "dkg.json"
-    now = timeit.default_timer()
-    if os.path.exists(file_path):
-        with open(file_path, "r") as file:
-            dkg_key = json.load(file)
-    else:
-        dkg_key = await dkg.request_dkg(threshold, party, key_type="BTC")
-        with open("pyfrost/zbtc/dkg.json", "w") as file:
-            json.dump(dkg_key, file)
-    then = timeit.default_timer()
+    mpc_dkg_key = data["mpc_wallet"]
+    eth_dkg_key = data["ethereum"]
+    logging.info(f'The MPC Wallet DKG is loaded: DKG is {mpc_dkg_key["result"]}')
+    logging.info(f'The Ethereum DKG is loaded: DKG is {eth_dkg_key["result"]}')
 
-    logging.info(f"Requesting DKG takes: {then - now} seconds.")
-    logging.info(f'The DKG result is {dkg_key["result"]}')
+    mpc_public_key = mpc_dkg_key["public_key"]
+    mpc_address = get_taproot_address(mpc_public_key).to_string()
+    eth_public_key = eth_dkg_key["public_key"]
+    logging.info(f"MPC Wallet: {mpc_address}")
+    logging.info(f"Ethereum Public Key: {eth_public_key}")
 
-    dkg_public_key = dkg_key["public_key"]
-    logging.info(f"dkg key: {dkg_key}")
 
-    for i in range(num_signs):
-        logging.info(f"Get signature {i} with DKG public key {dkg_public_key}")
+@app.route("/mint", methods=["POST"])
+def mint():
+    try:
+        # Extracting fee and tx_hash and public_key_hex from the request body
+        data = request.json
+        tx_hash = data["tx_hash"]
+        public_key_hex = data["public_key_hex"]
+        logging.info(f"Minting for {public_key_hex} with hash {tx_hash}")
 
-        dkg_party: List = dkg_key["party"]
+        nodes_info = NodesInfo()
+        sa = SA(nodes_info, default_timeout=50)
+
+        dkg_party = eth_dkg_key["party"]
         nonces_dict = {}
-
         for node_id in dkg_party:
             nonce = nonces[node_id].pop()
             nonces_dict[node_id] = nonce
 
-        from_address = get_taproot_address(dkg_public_key).to_string()
-        fee_amount = to_satoshis(0.00000010)
-        send_amount = to_satoshis(0.00000020)
-        to_address = PublicKey(
-            "03ffac5f6f2f5723ee1ed1f42827cc5bef641f8b79cbddf768f031744748739972"
+        deposit = get_deposit(tx_hash, public_key_hex)
+        msg = Web3.solidity_keccak(
+            ["uint256", "uint256", "address"],
+            [
+                int(deposit["tx"], 16),
+                deposit["amount"],
+                Web3.to_checksum_address(deposit["eth_address"]),
+            ],
         )
+
+        data = {
+            "method": "mint",
+            "data": {"tx_hash": tx_hash, "public_key_hex": public_key_hex, "hash": msg},
+        }
+
+        sig = asyncio.run(
+            sa.request_signature(eth_dkg_key, nonces_dict, data, dkg_party)
+        )
+        logging.info(f"Minting siganture is: {sig}")
+        return jsonify(sig)
+    except Exception as e:
+        logging.error(f"Error in burn process: {str(e)}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/send", methods=["POST"])
+def send():
+    try:
+        # Extracting fee and tx_hash from the request body
+        data = request.json
+        to_address = data["to"]
+        logging.info(f"Sending to {to_address}")
+
+        nodes_info = NodesInfo()
+        sa = SA(nodes_info, default_timeout=50)
+
+        dkg_party = mpc_dkg_key["party"]
+        nonces_dict = {}
+        for node_id in dkg_party:
+            nonce = nonces[node_id].pop()
+            nonces_dict[node_id] = nonce
+
+        send_amount = to_satoshis(0.00000001)
+
+        utxos = get_utxos(mpc_address, FEE_AMOUNT + send_amount)
+        logging.debug(f"UTxOs {utxos}")
+
+        tx, tx_digests = get_simple_withdraw_tx(
+            mpc_address, utxos, to_address, send_amount, FEE_AMOUNT
+        )
+
+        for tx_digest in tx_digests:
+            data = {
+                "method": "get_simple_withdraw_tx",
+                "data": {
+                    "from": mpc_address,
+                    "fee": FEE_AMOUNT,
+                    "send_amount": send_amount,
+                    "to": to_address,
+                    "hash": tx_digest.hex(),
+                },
+            }
+            group_sign = asyncio.run(
+                sa.request_signature(mpc_dkg_key, nonces_dict, data, dkg_party)
+            )
+            sig = bytes_from_int(
+                int(group_sign["public_nonce"]["x"], 16)
+            ) + bytes_from_int(group_sign["signature"])
+            tx.witnesses.append(TxWitnessInput([sig.hex()]))
+
+        logging.info(f"tx witnesses: {tx.witnesses}")
+
+        raw_tx = tx.serialize()
+        logging.info(f"Raw tx: {raw_tx}")
+        response = broadcast_tx(raw_tx)
+        logging.info(f"Transaction Info: {json.dumps(response.json(), indent=4)}")
+        return jsonify(response.json())
+    except Exception as e:
+        logging.error(f"Error in burn process: {str(e)}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/burn", methods=["POST"])
+def burn():
+    try:
+        # Extracting fee and tx_hash from the request body
+        data = request.json
+        tx_hash = data["tx_hash"]
+        logging.info(f"Burning for hash {tx_hash}")
+
+        nodes_info = NodesInfo()
+        sa = SA(nodes_info, default_timeout=50)
+
+        dkg_party = mpc_dkg_key["party"]
+        nonces_dict = {}
+        for node_id in dkg_party:
+            nonce = nonces[node_id].pop()
+            nonces_dict[node_id] = nonce
+
+        burned = get_burned(tx_hash, web3, ZBTC_ADDRESS)
+        logging.debug(f"Burn Info: {burned}")
+        send_amount = burned["amount"]
+        single_spend_txid = burned["singleSpendTx"]
+        single_spend_vout = 0
+        to_address = burned["bitcoinAddress"]
+        to_address = PublicKey(to_address)
         to_address = to_address.get_segwit_address().to_string()
-        logging.info(
-            f"Initiate transfer {send_amount} satoshi from {from_address} to {to_address}. fee: {fee_amount} satoshi"
+
+        utxos = get_utxos(mpc_address, FEE_AMOUNT + send_amount)
+        logging.debug(f"UTxOs {utxos}")
+
+        tx, tx_digests = get_withdraw_tx(
+            mpc_address,
+            utxos,
+            to_address,
+            send_amount,
+            FEE_AMOUNT,
+            single_spend_txid,
+            single_spend_vout,
         )
 
-        sa_data = {"data": "hi"}
-        # utxos = get_utxos(from_address, fee_amount + send_amount)
-        # tx, tx_digest = get_withdraw_tx(
-        #     from_address,
-        #     utxos,
-        #     to_address,
-        #     send_amount,
-        #     fee_amount,
-        #     "f5ba44e5b6f6df3fd4d939184597938935814e7bf7cb75fe8efcf1274a5f70de",
-        #     0,
-        # )
-        # tx_digest = tx_digest.hex()
-        now = timeit.default_timer()
+        for tx_digest in tx_digests:
+            data = {
+                "method": "get_withdraw_tx",
+                "data": {
+                    "burn_tx_hash": tx_hash,
+                    "hash": tx_digest.hex(),
+                },
+            }
+            group_sign = asyncio.run(
+                sa.request_signature(mpc_dkg_key, nonces_dict, data, dkg_party)
+            )
+            sig = bytes_from_int(
+                int(group_sign["public_nonce"]["x"], 16)
+            ) + bytes_from_int(group_sign["signature"])
+            tx.witnesses.append(TxWitnessInput([sig.hex()]))
 
-        group_sign = await sa.request_signature(
-            dkg_key, nonces_dict, sa_data, dkg_key["party"]
-        )
-        then = timeit.default_timer()
+        logging.info(f"tx witnesses: {tx.witnesses}")
 
-        logging.info(f"Requesting signature {i} takes {then - now} seconds")
-        logging.info(f"Signature data: {group_sign}")
-
-        # sig = bytes_from_int(int(group_sign["public_nonce"]["x"], 16)) + bytes_from_int(
-        #     group_sign["signature"]
-        # )
-        # tx.witnesses.append(TxWitnessInput([sig.hex()]))
         # raw_tx = tx.serialize()
         # resp = broadcast_tx(raw_tx)
         # logging.info(f"Transaction Info: {json.dumps(resp.json(), indent=4)}")
+        # return jsonify(resp.json())
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        logging.error(f"Error in burn process: {str(e)}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":
+    # Initialize logging
     file_path = "logs"
     file_name = "test.log"
     log_formatter = logging.Formatter(
@@ -130,15 +262,7 @@ if __name__ == "__main__":
     root_logger.setLevel(logging.DEBUG)
 
     sys.set_int_max_str_digits(0)
-
     total_node_number = int(sys.argv[1])
-    dkg_threshold = int(sys.argv[2])
-    num_parties = int(sys.argv[3])
-    num_signs = int(sys.argv[4])
-
-    try:
-        asyncio.run(
-            run_sample(total_node_number, dkg_threshold, num_parties, num_signs)
-        )
-    except KeyboardInterrupt:
-        pass
+    asyncio.run(initialization(total_node_number))
+    logging.info("Initialization has been completed.")
+    app.run(host="0.0.0.0", port=8000, debug=True)

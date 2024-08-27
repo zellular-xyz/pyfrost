@@ -1,3 +1,5 @@
+import json
+
 from pyfrost.network.dkg import Dkg
 from abstracts import NodesInfo
 import logging
@@ -9,7 +11,9 @@ import random
 import asyncio
 
 
-async def run_sample(total_node_number: int, threshold: int, n: int) -> None:
+async def initiate_dkg(
+    total_node_number: int, threshold: int, n: int, dkg_type: str, dkg_name: any
+) -> None:
     nodes_info = NodesInfo()
     all_nodes = nodes_info.get_all_nodes(total_node_number)
     dkg = Dkg(nodes_info, default_timeout=50)
@@ -21,13 +25,29 @@ async def run_sample(total_node_number: int, threshold: int, n: int) -> None:
 
     # Requesting DKG:
     now = timeit.default_timer()
-    dkg_key = await dkg.request_dkg(threshold, party)
+    dkg_key = await dkg.request_dkg(threshold, party, dkg_type)
     then = timeit.default_timer()
 
     logging.info(f"Requesting DKG takes: {then - now} seconds.")
     logging.info(f'The DKG result is {dkg_key["result"]}')
 
-    logging.info(f"dkg key: {dkg_key}")
+    logging.info(f"DKG key: {dkg_key}")
+    dkg_key["threshold"] = threshold
+    dkg_key["number_of_nodes"] = n
+
+    dkg_file_path = "pyfrost/zbtc"
+    dkg_file_name = "dkgs.json"
+    if not os.path.exists(f"{dkg_file_path}/{dkg_file_name}"):
+        os.mkdir(dkg_file_path) if not os.path.exists(dkg_file_path) else None
+        data = {}
+    else:
+        with open(f"{dkg_file_path}/{dkg_file_name}", "r") as file:
+            data = json.load(file)
+
+    data[dkg_name] = dkg_key
+
+    with open(f"{dkg_file_path}/{dkg_file_name}", "w") as file:
+        json.dump(data, file, indent=4)
 
 
 if __name__ == "__main__":
@@ -54,8 +74,14 @@ if __name__ == "__main__":
     total_node_number = int(sys.argv[1])
     dkg_threshold = int(sys.argv[2])
     num_parties = int(sys.argv[3])
+    dkg_type = sys.argv[4]
+    dkg_name = sys.argv[5]
 
     try:
-        asyncio.run(run_sample(total_node_number, dkg_threshold, num_parties))
+        asyncio.run(
+            initiate_dkg(
+                total_node_number, dkg_threshold, num_parties, dkg_type, dkg_name
+            )
+        )
     except KeyboardInterrupt:
         pass

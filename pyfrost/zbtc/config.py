@@ -1,3 +1,6 @@
+from bitcoinutils.setup import setup
+from bitcoinutils.utils import to_satoshis
+
 VALIDATED_IPS = {
     "127.0.0.1": [
         "/pyfrost/v1/dkg/round1",
@@ -16,3 +19,11 @@ PRIVATE_KEYS = [
     99850468881288865969830477394342281311627203479665875022932202186669120503624,
 ]
 PRIVATE_KEY = PRIVATE_KEYS[0]
+
+ZBTC_ADDRESS = "0x0323C15f879C8c8F024154BF5179c75e2eb9cAaD"
+FEE_AMOUNT = to_satoshis(0.00000001)
+
+BTC_NETWORK = "mainnet"
+BASE_URL = "https://mempool.space/api"
+
+MPC_ADDRESS = "bc1pu4gyy8an4af2wnwqd3y682rh4du2cdtvkz3vcjmszdtc2q6etl0s25mhc2"

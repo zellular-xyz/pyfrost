@@ -33,7 +33,7 @@ async def sign_request(url: str, dkg_key: Dict, data: Dict, timeout: int = 10):
                     "message": msg,
                     "nonces_dict": nonces_dict,
                     "aggregated_public_nonce": aggregated_public_nonce,
-                    "public_key_share": dkg_key["public_shares"][str(sign["id"])],
+                    "public_key_share": sign["public_key"],
                     "single_signature": sign,
                     "group_key": dkg_key["public_key"],
                     "key_type": sign["key_type"],
