@@ -1,3 +1,4 @@
+from eth_abi.packed import encode_packed
 from fastecdsa import keys
 from hashlib import sha256
 from .crypto_utils import (
@@ -318,12 +319,16 @@ def single_sign(
     group_key_pub = pub_compress(code_to_pub(group_key))
     byte_pub_x = bytes.fromhex(group_key_pub["x"].replace("0x", ""))
     if key_type == "ETH":
-        challenge = sha256(
-            byte_pub_x
-            + group_key_pub["y_parity"].to_bytes(1, "big")
-            + message_bytes
-            + bytes.fromhex(pub_to_addr(aggregated_public_nonce).replace("0x", ""))
-        ).digest()
+        packed_data = encode_packed(
+            ["bytes32", "uint8", "bytes32", "address"],
+            [
+                byte_pub_x,
+                group_key_pub["y_parity"],
+                bytes.fromhex(message_bytes.decode("utf-8")),
+                pub_to_addr(aggregated_public_nonce),
+            ],
+        )
+        challenge = sha256(packed_data).digest()
 
         # Calculate signature share
         coef = lagrange_coef(index, len(nonces_list), nonces_list, 0)
@@ -527,7 +532,7 @@ def aggregate_signatures(
         "public_nonce": pub_compress(aggregated_public_nonce),
         "public_key": pub_compress(code_to_pub(group_key)),
         "signature": aggregated_signature,
-        "message_bytes": message_bytes,
+        "message": message,
         "key_type": key_type,
     }
 
@@ -536,17 +541,19 @@ def verify_group_signature(aggregated_signature: Dict) -> bool:
     byte_public_key_x = bytes.fromhex(
         aggregated_signature["public_key"]["x"].replace("0x", "")
     )
+    message_bytes = aggregated_signature["message"].encode("utf-8")
     # Calculate the challenge
     if aggregated_signature["key_type"] == "ETH":
-        byte_aggregated_nonce = bytes.fromhex(
-            aggregated_signature["nonce"].replace("0x", "")
+        packed_data = encode_packed(
+            ["bytes32", "uint8", "bytes32", "address"],
+            [
+                byte_public_key_x,
+                aggregated_signature["public_key"]["y_parity"],
+                bytes.fromhex(message_bytes.decode("utf-8")),
+                aggregated_signature["nonce"],
+            ],
         )
-        challenge = sha256(
-            byte_public_key_x
-            + aggregated_signature["public_key"]["y_parity"].to_bytes(1, "big")
-            + aggregated_signature["message_bytes"]
-            + byte_aggregated_nonce
-        ).digest()
+        challenge = sha256(packed_data).digest()
         challenge_int = int.from_bytes(challenge, "big")
         # Calculate the point
         point = (aggregated_signature["signature"] * ecurve.G) + (
@@ -558,7 +565,7 @@ def verify_group_signature(aggregated_signature: Dict) -> bool:
         byte_aggregated_nonce = bytes.fromhex(
             aggregated_signature["public_nonce"]["x"].replace("0x", "")
         )
-        msg_bytes = bytes.fromhex(aggregated_signature["message_bytes"].decode("utf-8"))
+        msg_bytes = bytes.fromhex(aggregated_signature["message"])
 
         if len(msg_bytes) != 32:
             raise ValueError("The message must be a 32-byte array.")

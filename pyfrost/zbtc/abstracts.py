@@ -4,6 +4,7 @@ import time
 from urllib.parse import urlparse
 
 from bitcoinutils.keys import PublicKey
+from bitcoinutils.utils import to_satoshis
 from web3 import Web3
 
 from pyfrost.btc_transaction_utils import (
@@ -11,9 +12,10 @@ from pyfrost.btc_transaction_utils import (
     get_simple_withdraw_tx,
     get_burned,
     get_deposit,
+    get_withdraw_tx,
 )
 from pyfrost.network.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
-from config import VALIDATED_IPS, ZBTC_ADDRESS, MPC_ADDRESS
+from config import VALIDATED_IPS, ZBTC_ADDRESS, MPC_ADDRESS, DepositType
 from typing import Dict
 import hashlib
 
@@ -92,15 +94,16 @@ class NodeValidators(Validators):
             from_address = data["from"]
             to_address = data["to"]
             fee = data["fee"]
+            utxos = data["utxos"]
             tx_digest = bytes.fromhex(data["hash"])
             send_amount = data["send_amount"]
-            utxos = get_utxos(from_address, fee + send_amount)
             tx, tx_digests = get_simple_withdraw_tx(
                 from_address, utxos, to_address, send_amount, fee
             )
             if tx_digest in tx_digests:
                 result = {
-                    "data": input_data,
+                    "input": input_data,
+                    "sign_params": {"tx_digest": tx_digest.hex()},
                     "hash": tx_digest.hex(),
                 }
                 return result
@@ -114,17 +117,19 @@ class NodeValidators(Validators):
             burn_tx_hash = data["burn_tx_hash"]
             tx_digest = bytes.fromhex(data["hash"])
             fee = data["fee"]
+            utxos = data["utxos"]
 
             burned = get_burned(burn_tx_hash, web3, ZBTC_ADDRESS)
+            logging.debug(f"Burn Info: {burned}")
             send_amount = burned["amount"]
             single_spend_txid = burned["singleSpendTx"]
             single_spend_vout = 0
             to_address = burned["bitcoinAddress"]
             to_address = PublicKey(to_address)
             to_address = to_address.get_segwit_address().to_string()
+            burner_address = burned["burner"]
 
-            utxos = get_utxos(MPC_ADDRESS, fee + send_amount)
-            tx, tx_digests = get_simple_withdraw_tx(
+            tx, tx_digests = get_withdraw_tx(
                 MPC_ADDRESS,
                 utxos,
                 to_address,
@@ -132,23 +137,28 @@ class NodeValidators(Validators):
                 fee,
                 single_spend_txid,
                 single_spend_vout,
+                burner_address,
             )
             if tx_digest in tx_digests:
                 result = {
-                    "data": input_data,
+                    "input": input_data,
+                    "sign_params": {"tx_digest": tx_digest.hex()},
                     "hash": tx_digest.hex(),
                 }
-                print("verified")
                 return result
             else:
                 raise ValueError(f"Invalid Data: {input_data}")
 
         elif method == "mint":
-            tx_hash = data["tx_hash"]
-            public_key_hex = data["public_key_hex"]
+            tx_hash = data["tx"]
+            bitcoin_address = data["bitcoin_address"]
+            amount = data["amount"]
+            to = data["to"]
             message_hash = data["hash"]
 
-            deposit = get_deposit(tx_hash, public_key_hex)
+            deposit = get_deposit(
+                tx_hash, bitcoin_address, MPC_ADDRESS, DepositType.BRIDGE
+            )
             msg = Web3.solidity_keccak(
                 ["uint256", "uint256", "address"],
                 [
@@ -156,13 +166,22 @@ class NodeValidators(Validators):
                     deposit["amount"],
                     Web3.to_checksum_address(deposit["eth_address"]),
                 ],
-            )
-            if msg == message_hash:
+            ).hex()
+            if (
+                msg == message_hash
+                and int(tx_hash, 16) == int(deposit["tx"], 16)
+                and deposit["amount"] == amount
+                and to == Web3.to_checksum_address(deposit["eth_address"])
+            ):
                 result = {
-                    "data": input_data,
+                    "input": input_data,
+                    "sign_params": {
+                        "tx": int(deposit["tx"], 16),
+                        "amount": deposit["amount"],
+                        "to": Web3.to_checksum_address(deposit["eth_address"]),
+                    },
                     "hash": msg,
                 }
-                print("verified")
                 return result
             else:
                 raise ValueError(f"Invalid Data: {input_data}")

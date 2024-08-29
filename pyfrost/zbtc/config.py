@@ -1,3 +1,5 @@
+from enum import Enum
+
 from bitcoinutils.setup import setup
 from bitcoinutils.utils import to_satoshis
 
@@ -21,9 +23,15 @@ PRIVATE_KEYS = [
 PRIVATE_KEY = PRIVATE_KEYS[0]
 
 ZBTC_ADDRESS = "0x0323C15f879C8c8F024154BF5179c75e2eb9cAaD"
-FEE_AMOUNT = to_satoshis(0.00000001)
+FEE_AMOUNT = to_satoshis(0.00001000)
 
-BTC_NETWORK = "mainnet"
-BASE_URL = "https://mempool.space/api"
+BTC_NETWORK = "testnet"
+BASE_URL = "https://mempool.space/testnet4/api"
 
-MPC_ADDRESS = "bc1pu4gyy8an4af2wnwqd3y682rh4du2cdtvkz3vcjmszdtc2q6etl0s25mhc2"
+MPC_ADDRESS = "tb1pu4gyy8an4af2wnwqd3y682rh4du2cdtvkz3vcjmszdtc2q6etl0saudcz9"
+
+
+# Define an enum class
+class DepositType(Enum):
+    BRIDGE = 1
+    WITHDRAW = 2

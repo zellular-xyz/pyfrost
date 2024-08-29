@@ -24,7 +24,9 @@ def request_handler(func):
             )
             result: Dict = func(self, *args, **kwargs)
             to_sign = json.dumps(result, sort_keys=True).encode("utf-8")
-            result["signature"] = ecdsa.sign(to_sign, self.private, curve.secp256k1)
+            result["node_signature"] = ecdsa.sign(
+                to_sign, self.private, curve.secp256k1
+            )
             logging.debug(
                 f"{request.remote_addr}{route_path} Sent message: {json.dumps(result, indent=4)}"
             )

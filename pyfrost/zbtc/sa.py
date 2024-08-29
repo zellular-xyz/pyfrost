@@ -1,7 +1,7 @@
 import json
 import sys
 
-from bitcoinutils.keys import PublicKey
+from bitcoinutils.keys import PublicKey, P2trAddress, P2wpkhAddress
 from bitcoinutils.setup import setup
 from bitcoinutils.transactions import TxWitnessInput
 from bitcoinutils.utils import to_satoshis
@@ -24,7 +24,13 @@ import logging
 import os
 import asyncio
 
-from pyfrost.zbtc.config import FEE_AMOUNT, BTC_NETWORK, ZBTC_ADDRESS
+from pyfrost.zbtc.config import (
+    FEE_AMOUNT,
+    BTC_NETWORK,
+    ZBTC_ADDRESS,
+    MPC_ADDRESS,
+    DepositType,
+)
 
 setup(BTC_NETWORK)
 
@@ -80,8 +86,8 @@ def mint():
         # Extracting fee and tx_hash and public_key_hex from the request body
         data = request.json
         tx_hash = data["tx_hash"]
-        public_key_hex = data["public_key_hex"]
-        logging.info(f"Minting for {public_key_hex} with hash {tx_hash}")
+        bitcoin_address = P2wpkhAddress(data["public_key"]).to_string()
+        logging.info(f"Minting for {bitcoin_address} with hash {tx_hash}")
 
         nodes_info = NodesInfo()
         sa = SA(nodes_info, default_timeout=50)
@@ -92,7 +98,7 @@ def mint():
             nonce = nonces[node_id].pop()
             nonces_dict[node_id] = nonce
 
-        deposit = get_deposit(tx_hash, public_key_hex)
+        deposit = get_deposit(tx_hash, bitcoin_address, MPC_ADDRESS, DepositType.BRIDGE)
         msg = Web3.solidity_keccak(
             ["uint256", "uint256", "address"],
             [
@@ -100,11 +106,17 @@ def mint():
                 deposit["amount"],
                 Web3.to_checksum_address(deposit["eth_address"]),
             ],
-        )
+        ).hex()
 
         data = {
             "method": "mint",
-            "data": {"tx_hash": tx_hash, "public_key_hex": public_key_hex, "hash": msg},
+            "data": {
+                "tx": tx_hash,
+                "bitcoin_address": bitcoin_address,
+                "amount": deposit["amount"],
+                "hash": msg,
+                "to": Web3.to_checksum_address(deposit["eth_address"]),
+            },
         }
 
         sig = asyncio.run(
@@ -123,18 +135,14 @@ def send():
         # Extracting fee and tx_hash from the request body
         data = request.json
         to_address = data["to"]
+        amount = data["amount"]
         logging.info(f"Sending to {to_address}")
 
         nodes_info = NodesInfo()
         sa = SA(nodes_info, default_timeout=50)
-
         dkg_party = mpc_dkg_key["party"]
-        nonces_dict = {}
-        for node_id in dkg_party:
-            nonce = nonces[node_id].pop()
-            nonces_dict[node_id] = nonce
 
-        send_amount = to_satoshis(0.00000001)
+        send_amount = to_satoshis(amount)
 
         utxos = get_utxos(mpc_address, FEE_AMOUNT + send_amount)
         logging.debug(f"UTxOs {utxos}")
@@ -144,16 +152,23 @@ def send():
         )
 
         for tx_digest in tx_digests:
+            nonces_dict = {}
+            for node_id in dkg_party:
+                nonce = nonces[node_id].pop()
+                nonces_dict[node_id] = nonce
+
             data = {
                 "method": "get_simple_withdraw_tx",
                 "data": {
                     "from": mpc_address,
                     "fee": FEE_AMOUNT,
+                    "utxos": utxos,
                     "send_amount": send_amount,
                     "to": to_address,
                     "hash": tx_digest.hex(),
                 },
             }
+
             group_sign = asyncio.run(
                 sa.request_signature(mpc_dkg_key, nonces_dict, data, dkg_party)
             )
@@ -166,9 +181,11 @@ def send():
 
         raw_tx = tx.serialize()
         logging.info(f"Raw tx: {raw_tx}")
-        response = broadcast_tx(raw_tx)
-        logging.info(f"Transaction Info: {json.dumps(response.json(), indent=4)}")
-        return jsonify(response.json())
+        resp = broadcast_tx(raw_tx)
+        logging.info(
+            f"Transaction Info: {json.dumps({'raw_tx': raw_tx, 'tx_hash': resp.text}, indent=4)}"
+        )
+        return jsonify({"tx_hash": resp.text})
     except Exception as e:
         logging.error(f"Error in burn process: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -184,12 +201,7 @@ def burn():
 
         nodes_info = NodesInfo()
         sa = SA(nodes_info, default_timeout=50)
-
         dkg_party = mpc_dkg_key["party"]
-        nonces_dict = {}
-        for node_id in dkg_party:
-            nonce = nonces[node_id].pop()
-            nonces_dict[node_id] = nonce
 
         burned = get_burned(tx_hash, web3, ZBTC_ADDRESS)
         logging.debug(f"Burn Info: {burned}")
@@ -199,6 +211,7 @@ def burn():
         to_address = burned["bitcoinAddress"]
         to_address = PublicKey(to_address)
         to_address = to_address.get_segwit_address().to_string()
+        burner_address = burned["burner"]
 
         utxos = get_utxos(mpc_address, FEE_AMOUNT + send_amount)
         logging.debug(f"UTxOs {utxos}")
@@ -211,16 +224,25 @@ def burn():
             FEE_AMOUNT,
             single_spend_txid,
             single_spend_vout,
+            burner_address,
         )
+
+        nonces_dict = {}
+        for node_id in dkg_party:
+            nonce = nonces[node_id].pop()
+            nonces_dict[node_id] = nonce
 
         for tx_digest in tx_digests:
             data = {
                 "method": "get_withdraw_tx",
                 "data": {
+                    "utxos": utxos,
                     "burn_tx_hash": tx_hash,
                     "hash": tx_digest.hex(),
+                    "fee": FEE_AMOUNT,
                 },
             }
+
             group_sign = asyncio.run(
                 sa.request_signature(mpc_dkg_key, nonces_dict, data, dkg_party)
             )
@@ -229,13 +251,14 @@ def burn():
             ) + bytes_from_int(group_sign["signature"])
             tx.witnesses.append(TxWitnessInput([sig.hex()]))
 
-        logging.info(f"tx witnesses: {tx.witnesses}")
+        logging.info(f"tx: {tx}")
 
-        # raw_tx = tx.serialize()
-        # resp = broadcast_tx(raw_tx)
-        # logging.info(f"Transaction Info: {json.dumps(resp.json(), indent=4)}")
-        # return jsonify(resp.json())
-        return jsonify({"status": "ok"})
+        raw_tx = tx.serialize()
+        resp = broadcast_tx(raw_tx)
+        logging.info(
+            f"Transaction Info: {json.dumps({'raw_tx': raw_tx, 'tx_hash': resp.text}, indent=4)}"
+        )
+        return jsonify({"tx_hash": resp.text})
     except Exception as e:
         logging.error(f"Error in burn process: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500

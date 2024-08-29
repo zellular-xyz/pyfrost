@@ -18,7 +18,6 @@ async def sign_request(url: str, dkg_key: Dict, data: Dict, timeout: int = 10):
                 result = await response.json()
                 if result["status"] != "SUCCESSFUL":
                     return result
-
                 sign = result["signature_data"]
                 msg = result["hash"]
                 nonces_dict = data["nonces_dict"]
@@ -120,9 +119,9 @@ class SA:
             _aggregated_public_nonce = data.get("signature_data", {}).get(
                 "aggregated_public_nonce"
             )
+            sample_result.append(data)
             if _hash and str_message is None:
                 str_message = _hash
-                sample_result.append(data)
             if _signature_data:
                 signs.append(_signature_data)
             if _aggregated_public_nonce:
@@ -170,9 +169,10 @@ class SA:
         if pyfrost.frost.verify_group_signature(aggregated_sign):
             aggregated_sign["message_hash"] = str_message
             aggregated_sign["result"] = "SUCCESSFUL"
-            aggregated_sign["signature_data"] = sample_result
             aggregated_sign["request_id"] = request_id
+            aggregated_sign["sa_data"] = sa_data
             logging.info(f'Aggregated sign result: {aggregated_sign["result"]}')
         else:
+            aggregated_sign["signature_data"] = sample_result
             aggregated_sign["result"] = "FAILED"
         return aggregated_sign

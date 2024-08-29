@@ -9,9 +9,11 @@ from bitcoinutils.transactions import Transaction, TxInput, TxOutput, TxWitnessI
 from bitcoinutils.script import Script
 from bitcoinutils.setup import setup
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
+from bitcoinutils.utils import to_satoshis
+
 import pyfrost.frost as frost
 from pyfrost.crypto_utils import code_to_pub, pub_to_code
-from pyfrost.zbtc.config import BASE_URL, BTC_NETWORK
+from pyfrost.zbtc.config import BASE_URL, BTC_NETWORK, DepositType
 
 setup(BTC_NETWORK)
 
@@ -78,16 +80,27 @@ def get_withdraw_tx(
     fee_amount,
     single_spend_txid,
     single_spend_vout,
+    eth_address,
 ):
+    single_spend_tx = get_deposit(
+        single_spend_txid, to_address, from_address, DepositType.WITHDRAW
+    )
+    assert (
+        single_spend_tx["bitcoin_address"] == to_address
+    ), f"The withdraw transaction is from address {single_spend_tx['bitcoin_address']} and cannot send funds to {to_address}"
+    assert (
+        int(single_spend_tx["eth_address"], 16) == int(eth_address, 16)
+    ), f"{eth_address} initiates burn transaction, and the address on withdraw is {single_spend_tx['eth_address']}"
+
     from_address = P2trAddress(from_address)
-    first_script_pubkey = from_address.to_script_pub_key()
-    utxos_script_pubkeys = [first_script_pubkey] * len(utxos)
     to_address = P2wpkhAddress(to_address)
 
     txins = [TxInput(utxo["txid"], utxo["vout"]) for utxo in utxos]
     amounts = [utxo["value"] for utxo in utxos]
+
     txins.append(TxInput(single_spend_txid, single_spend_vout))
-    amounts.append(1)
+    amounts.append(single_spend_tx["amount"])
+    send_amount += single_spend_tx["amount"]
 
     first_amount = sum(amounts)
 
@@ -96,12 +109,15 @@ def get_withdraw_tx(
         first_amount - send_amount - fee_amount, from_address.to_script_pub_key()
     )
 
+    first_script_pubkey = from_address.to_script_pub_key()
+    utxos_script_pubkeys = [first_script_pubkey] * len(txins)
+
     tx = Transaction(txins, [txout1, txout2], has_segwit=True)
     tx_digests = [
         tx.get_transaction_taproot_digest(
             i, utxos_script_pubkeys, amounts, 0, sighash=TAPROOT_SIGHASH_ALL
         )
-        for i in range(len(utxos))
+        for i in range(len(txins))
     ]
     return tx, tx_digests
 
@@ -139,7 +155,17 @@ def get_utxos(bitcoin_address, desired_amount):
     total_value = 0
     selected_utxos = []
     for utxo in utxos:
-        if utxo["value"] == 1:
+        url = f"{BASE_URL}/tx/{utxo['txid']}"
+        tx = requests.get(url).json()
+        op_pushnum = f"OP_PUSHNUM_{DepositType.WITHDRAW}"
+        is_deposit_for_withdraw = any(
+            [
+                out["scriptpubkey_type"] == "op_return"
+                and op_pushnum in out["scriptpubkey_asm"]
+                for out in tx["vout"]
+            ]
+        )
+        if is_deposit_for_withdraw:
             continue
         if total_value >= desired_amount:
             break
@@ -148,23 +174,28 @@ def get_utxos(bitcoin_address, desired_amount):
     return selected_utxos
 
 
-def get_deposit(tx_hash, public_key_hex, mpc_wallet):
-    public_key = PublicKey(public_key_hex)
-    # todo: other types of bitcoin addresses should be implemented
-    bitcoin_address = public_key.get_segwit_address().to_string()
-
-    url = f"{BASE_URL}/txs/{tx_hash}"
+def get_deposit(tx_hash: str, bitcoin_address: str, mpc_wallet: str, type: DepositType):
+    url = f"{BASE_URL}/tx/{tx_hash}"
     tx = requests.get(url).json()
-    assert tx["confirmations"] >= 1, "tx does not have enough confirmations"
-    outputs = tx["outputs"]
-    check = lambda out: out["script_type"] == "pay-to-taproot" and out["addresses"] == [
-        mpc_wallet
-    ]
+    op_pushnum = f"OP_PUSHNUM_{type.value}"
+    assert tx["status"]["confirmed"], "tx does not have enough confirmations"
+    outputs = tx["vout"]
+    check = (
+        lambda out: out["scriptpubkey_type"] == "v1_p2tr"
+        and out["scriptpubkey_address"] == mpc_wallet
+    )
     amount = sum([out["value"] for out in outputs if check(out)])
     assert amount > 0, f"no pay-to-taproot deposit to {mpc_wallet}"
 
-    data = [out["data_hex"] for out in outputs if out["script_type"] == "null-data"]
-    assert len(data) > 0, "dest eth address is not included as OP RETURN output"
+    data = [
+        str(out["scriptpubkey_asm"]).split(" ")[-1]
+        for out in outputs
+        if out["scriptpubkey_type"] == "op_return"
+        and op_pushnum in out["scriptpubkey_asm"]
+    ]
+    assert (
+        len(data) > 0
+    ), f"dest eth address is not included as {type.name} OP RETURN output"
     eth_address = f"0x{data[0]}"
     validated = (
         all(c in string.hexdigits for c in eth_address[2:]) and len(eth_address) == 42
@@ -172,7 +203,7 @@ def get_deposit(tx_hash, public_key_hex, mpc_wallet):
     assert validated, f"{eth_address} is not valid eth address"
 
     return {
-        "tx": tx["hash"],
+        "tx": tx["txid"],
         "amount": amount,
         "bitcoin_address": bitcoin_address,
         "eth_address": eth_address,
@@ -192,19 +223,19 @@ def deposit_to_zex(
     deposit_sat: int,
     fee_sat: int,
     eth_address: str,
+    type: DepositType,
 ) -> str:
     utxos = get_utxos(pub.to_string(), fee_sat + deposit_sat)
     tx_ins = []
     amounts = []
     for utxo in utxos:
-        tx_in = TxInput(utxo["tx_hash"], utxo["tx_output_n"])
+        tx_in = TxInput(utxo["txid"], utxo["vout"])
         tx_ins.append(tx_in)
         amounts.append(utxo["value"])
     tx_outs = [
         TxOutput(deposit_sat, zex_pub.to_script_pub_key()),
-        TxOutput(0, Script(["OP_RETURN", eth_address])),
+        TxOutput(0, Script(["OP_RETURN", type.value, eth_address])),
     ]
-
     if sum(amounts) > fee_sat + deposit_sat:
         tx_outs.append(
             TxOutput(
@@ -213,7 +244,6 @@ def deposit_to_zex(
         )
 
     tx = Transaction(tx_ins, tx_outs, has_segwit=True)
-
     script_code = Script(
         [
             "OP_DUP",
@@ -227,12 +257,10 @@ def deposit_to_zex(
         sig = private.sign_segwit_input(tx, i, script_code, amounts[i])
 
         tx.witnesses.append(TxWitnessInput([sig, private.get_public_key().to_hex()]))
-
     return tx.serialize()
 
 
 def broadcast_tx(raw_tx: str):
-    url = "https://api.blockcypher.com/v1/btc/test3/txs/push"
-    data = {"tx": raw_tx}
-    response = requests.post(url, json=data)
+    url = f"{BASE_URL}/tx"
+    response = requests.post(url, data=raw_tx, headers={"Content-Type": "text/plain"})
     return response
