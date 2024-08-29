@@ -26,7 +26,6 @@ from .crypto_utils import (
     pub_decompress,
     complaint_sign,
     is_y_even,
-    lift_x,
 )
 from typing import List, Dict, Tuple
 import json

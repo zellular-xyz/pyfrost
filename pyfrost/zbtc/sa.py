@@ -1,7 +1,7 @@
 import json
 import sys
 
-from bitcoinutils.keys import PublicKey, P2trAddress, P2wpkhAddress
+from bitcoinutils.keys import PublicKey, P2wpkhAddress
 from bitcoinutils.setup import setup
 from bitcoinutils.transactions import TxWitnessInput
 from bitcoinutils.utils import to_satoshis

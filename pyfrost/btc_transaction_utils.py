@@ -1,5 +1,4 @@
 import json
-import random
 import secrets
 import string
 
@@ -9,10 +8,9 @@ from bitcoinutils.transactions import Transaction, TxInput, TxOutput, TxWitnessI
 from bitcoinutils.script import Script
 from bitcoinutils.setup import setup
 from bitcoinutils.constants import TAPROOT_SIGHASH_ALL
-from bitcoinutils.utils import to_satoshis
 
 import pyfrost.frost as frost
-from pyfrost.crypto_utils import code_to_pub, pub_to_code
+from pyfrost.crypto_utils import code_to_pub
 from pyfrost.zbtc.config import BASE_URL, BTC_NETWORK, DepositType
 
 setup(BTC_NETWORK)
@@ -100,14 +98,12 @@ def get_withdraw_tx(
 
     txins.append(TxInput(single_spend_txid, single_spend_vout))
     amounts.append(single_spend_tx["amount"])
-    send_amount += single_spend_tx["amount"]
+    send_amount += single_spend_tx["amount"] - fee_amount
 
     first_amount = sum(amounts)
 
     txout1 = TxOutput(send_amount, to_address.to_script_pub_key())
-    txout2 = TxOutput(
-        first_amount - send_amount - fee_amount, from_address.to_script_pub_key()
-    )
+    txout2 = TxOutput(first_amount - send_amount, from_address.to_script_pub_key())
 
     first_script_pubkey = from_address.to_script_pub_key()
     utxos_script_pubkeys = [first_script_pubkey] * len(txins)

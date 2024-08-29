@@ -1,6 +1,5 @@
 from enum import Enum
 
-from bitcoinutils.setup import setup
 from bitcoinutils.utils import to_satoshis
 
 VALIDATED_IPS = {

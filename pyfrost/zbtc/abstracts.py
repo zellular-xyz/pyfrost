@@ -4,11 +4,9 @@ import time
 from urllib.parse import urlparse
 
 from bitcoinutils.keys import PublicKey
-from bitcoinutils.utils import to_satoshis
 from web3 import Web3
 
 from pyfrost.btc_transaction_utils import (
-    get_utxos,
     get_simple_withdraw_tx,
     get_burned,
     get_deposit,
@@ -17,7 +15,6 @@ from pyfrost.btc_transaction_utils import (
 from pyfrost.network.abstract import Validators, DataManager, NodesInfo as BaseNodeInfo
 from config import VALIDATED_IPS, ZBTC_ADDRESS, MPC_ADDRESS, DepositType
 from typing import Dict
-import hashlib
 
 import json
 import os
