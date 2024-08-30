@@ -520,9 +520,6 @@ def aggregate_signatures(
     group_key: int,
     key_type: str = "ETH",
 ) -> Dict:
-    # Calculate message bytes
-    message_bytes = message.encode("utf-8")
-
     # Aggregate signatures
     aggregated_signature = sum(sign["signature"] for sign in single_signatures) % N
 

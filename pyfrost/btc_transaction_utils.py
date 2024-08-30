@@ -172,6 +172,7 @@ def get_utxos(bitcoin_address, desired_amount):
 
 def get_deposit(tx_hash: str, bitcoin_address: str, mpc_wallet: str, type: DepositType):
     url = f"{BASE_URL}/tx/{tx_hash}"
+    print(url)
     tx = requests.get(url).json()
     op_pushnum = f"OP_PUSHNUM_{type.value}"
     assert tx["status"]["confirmed"], "tx does not have enough confirmations"
