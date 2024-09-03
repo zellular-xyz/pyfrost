@@ -1,9 +1,13 @@
-from eth_abi.packed import encode_packed
 from fastecdsa import keys
 from hashlib import sha256
 
-from .btc_utils import btc_challenge, calculate_tweaked, btc_generate_signature_share, btc_verify_single_sign, \
-    btc_verify_group_signature
+from .btc_utils import (
+    btc_challenge,
+    calculate_tweaked,
+    btc_generate_signature_share,
+    btc_verify_single_sign,
+    btc_verify_group_signature,
+)
 from .crypto_utils import (
     pub_to_code,
     ecurve,
@@ -19,22 +23,22 @@ from .crypto_utils import (
     pub_compress,
     pub_to_addr,
     lagrange_coef,
-    calculate_tweak,
-    bytes_from_int,
     taproot_tweak_pubkey,
-    int_from_bytes,
-    tagged_hash,
     generate_random_private,
     N,
     pub_decompress,
     complaint_sign,
-    is_y_even,
 )
 from typing import List, Dict, Tuple
 import json
 from fastecdsa.point import Point
 
-from .eth_utils import eth_challenge, eth_generate_signature_share, eth_verify_single_sign, eth_verify_group_sign
+from .eth_utils import (
+    eth_challenge,
+    eth_generate_signature_share,
+    eth_verify_single_sign,
+    eth_verify_group_sign,
+)
 
 
 class KeyGen:
@@ -324,7 +328,9 @@ def single_sign(
     if key_type == "ETH":
         challenge = eth_challenge(group_key_pub, message, aggregated_public_nonce)
         coef = lagrange_coef(index, len(nonces_list), nonces_list, 0)
-        signature_share = eth_generate_signature_share(share, coef, challenge, nonce_d, nonce_e, my_row)
+        signature_share = eth_generate_signature_share(
+            share, coef, challenge, nonce_d, nonce_e, my_row
+        )
     elif key_type == "BTC":
         tweaked_share, tweaked_pubkey = calculate_tweaked(share, group_key_pub)
         challenge = btc_challenge(tweaked_pubkey, message, aggregated_public_nonce)
@@ -335,7 +341,8 @@ def single_sign(
             challenge,
             aggregated_public_nonce,
             nonce_d,
-            nonce_e, my_row
+            nonce_e,
+            my_row,
         )
     return {
         "id": id,
@@ -401,14 +408,23 @@ def verify_single_signature(signature_data: Dict) -> bool:
     # Calculate challenge
     group_key_pub = pub_compress(code_to_pub(signature_data["group_key"]))
     if signature_data["key_type"] == "ETH":
-        challenge = eth_challenge(group_key_pub, signature_data["message"], signature_data["aggregated_public_nonce"])
+        challenge = eth_challenge(
+            group_key_pub,
+            signature_data["message"],
+            signature_data["aggregated_public_nonce"],
+        )
         coef = lagrange_coef(index, len(nonces_dict), nonces_dict, 0)
         return eth_verify_single_sign(coef, challenge, public_nonce, signature_data)
 
     elif signature_data["key_type"] == "BTC":
-        byte_pub_x = bytes.fromhex(group_key_pub["x"].replace("0x", ""))
-        tweaked_pubkey_has_even_y, tweaked_pubkey = taproot_tweak_pubkey(byte_pub_x, b"")
-        challenge = btc_challenge(tweaked_pubkey, signature_data["message"], signature_data["aggregated_public_nonce"])
+        tweaked_pubkey_has_even_y, tweaked_pubkey = taproot_tweak_pubkey(
+            group_key_pub, b""
+        )
+        challenge = btc_challenge(
+            tweaked_pubkey,
+            signature_data["message"],
+            signature_data["aggregated_public_nonce"],
+        )
         coef = lagrange_coef(index, len(nonces_dict), nonces_dict, 0) % ecurve.q
         return btc_verify_single_sign(coef, challenge, public_nonce, signature_data)
 
@@ -468,10 +484,11 @@ def aggregate_signatures(
 def verify_group_signature(aggregated_signature: Dict) -> bool:
     group_pub_key = aggregated_signature["public_key"]
     message = aggregated_signature["message"]
-    aggregated_public_nonce = aggregated_signature["nonce"]
     # Calculate the challenge
     if aggregated_signature["key_type"] == "ETH":
-        challenge = eth_challenge(group_pub_key, message, pub_decompress(aggregated_signature["public_nonce"]))
+        challenge = eth_challenge(
+            group_pub_key, message, pub_decompress(aggregated_signature["public_nonce"])
+        )
         return eth_verify_group_sign(challenge, aggregated_signature)
 
     elif aggregated_signature["key_type"] == "BTC":

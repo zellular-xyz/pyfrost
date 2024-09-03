@@ -47,10 +47,12 @@ async def sign_request(url: str, dkg_key: Dict, data: Dict, timeout: int = 10):
                     "error": "Communication timed out",
                 }
             except Exception as e:
-                logging.error(f'An exception occurred: {type(e).__name__}: {e}', exc_info=True)
+                logging.error(
+                    f"An exception occurred: {type(e).__name__}: {e}", exc_info=True
+                )
                 return {
-                    'status': 'ERROR',
-                    'error': f'An exception occurred: {type(e).__name__}: {e}',
+                    "status": "ERROR",
+                    "error": f"An exception occurred: {type(e).__name__}: {e}",
                 }
 
 

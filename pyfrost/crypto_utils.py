@@ -332,15 +332,16 @@ def calculate_tweak(pubkey_x: bytes, scripts):
     return tweak_int
 
 
-def taproot_tweak_pubkey(pubkey, h) -> tuple[bool, int]:
-    t = int_from_bytes(tagged_hash("TapTweak", pubkey + h))
+def taproot_tweak_pubkey(public_key, h) -> tuple[Point, bytes]:
+    pubkey_point = pub_decompress(public_key)
+    t = int_from_bytes(tagged_hash("TapTweak", bytes_from_int(pubkey_point.x) + h))
     if t >= ecurve.q:
         raise ValueError
-    P = lift_x(int_from_bytes(pubkey))
+    P = pubkey_point
     if P is None:
         raise ValueError
     Q = P + ecurve.G * t
-    return is_y_even(Q), bytes_from_int(Q.x)
+    return Q, bytes_from_int(Q.x)
 
 
 # def pub_to_addr(public_key: Point) -> str:
