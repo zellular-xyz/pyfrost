@@ -29,8 +29,9 @@ def eth_generate_signature_share(share, coef, challenge, nonce_d, nonce_e, row):
     return signature_share
 
 def eth_verify_single_sign(coef, challenge, public_nonce, signature_data):
+    challenge_int = int.from_bytes(challenge, "big")
     point1 = public_nonce - (
-            challenge * coef * code_to_pub(signature_data["public_key_share"])
+            challenge_int * coef * code_to_pub(signature_data["public_key_share"])
     )
     point2 = signature_data["single_signature"]["signature"] * ecurve.G
     return point1 == point2

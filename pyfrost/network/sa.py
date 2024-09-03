@@ -37,20 +37,21 @@ async def sign_request(url: str, dkg_key: Dict, data: Dict, timeout: int = 10):
                     "group_key": dkg_key["public_key"],
                     "key_type": sign["key_type"],
                 }
-                # res = pyfrost.verify_single_signature(signature_data)
-                # if not res:
-                #     result["status"] = "MALICIOUS"
+                res = pyfrost.verify_single_signature(signature_data)
+                if not res:
+                    result["status"] = "MALICIOUS"
                 return result
             except asyncio.TimeoutError:
                 return {
                     "status": "TIMEOUT",
                     "error": "Communication timed out",
                 }
-            # except Exception as e:
-            #     return {
-            #         'status': 'ERROR',
-            #         'error': f'An exception occurred: {type(e).__name__}: {e}',
-            #     }
+            except Exception as e:
+                logging.error(f'An exception occurred: {type(e).__name__}: {e}', exc_info=True)
+                return {
+                    'status': 'ERROR',
+                    'error': f'An exception occurred: {type(e).__name__}: {e}',
+                }
 
 
 class SA:
