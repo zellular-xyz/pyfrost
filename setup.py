@@ -5,7 +5,7 @@ setup(
     version="0.1",
     packages=find_packages(exclude=["pyfrost/tests", "pyfrost/example"]),
     install_requires=[
-        "fastecdsa==2.2.3",
+        "fastecdsa==2.3.2",
         "Flask==3.0.0",
         "cryptography",
         "aiohttp==3.9.3",
