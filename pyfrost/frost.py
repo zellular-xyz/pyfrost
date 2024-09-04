@@ -332,11 +332,11 @@ def single_sign(
             share, coef, challenge, nonce_d, nonce_e, my_row
         )
     elif key_type == "BTC":
-        tweaked_share, tweaked_pubkey = calculate_tweaked(share, group_key_pub)
+        share, tweaked_pubkey = calculate_tweaked(share, group_key_pub)
         challenge = btc_challenge(tweaked_pubkey, message, aggregated_public_nonce)
         coef = lagrange_coef(index, len(nonces_list), nonces_list, 0) % ecurve.q
         signature_share = btc_generate_signature_share(
-            tweaked_share,
+            share,
             coef,
             challenge,
             aggregated_public_nonce,
@@ -429,7 +429,7 @@ def verify_single_signature(signature_data: Dict) -> bool:
         return btc_verify_single_sign(coef, challenge, public_nonce, signature_data)
 
 
-def aggregate_nonce(message: str, nonces_dict: Dict[str, Dict[str, int]]) -> str:
+def aggregate_nonce(message: str, nonces_dict: Dict[str, Dict[str, int]]) -> Point:
     # Convert nonces to a list and get bytes of the message
     nonces_list = list(nonces_dict.values())
     nonces_hash = sha256(json.dumps(nonces_list).encode()).digest()
