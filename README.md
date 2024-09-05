@@ -6,21 +6,18 @@ PyFrost is a Python implementation of the [FROST](https://eprint.iacr.org/2020/8
 
 PyFrost implements the cryptographic functions of the FROST protocol and includes a networking package that features libp2p clients for nodes, signature aggregators, and distributed key generators.
 
-
-## Cryptography Classes & Functions
-
 ## Network Package
 
 The network package includes the implementation of the following components:
 
 #### Node
-A HTTP server that facilitates the three rounds of the Distributed Key Generation (DKG) process, as well as nonce creation and signing methods.
+A Libp2p client that facilitates the three rounds of the Distributed Key Generation (DKG) process, as well as nonce creation and signing methods.
 
 #### Distributed Key Generator
 A Libp2p client responsible for initiating the DKG process through the node.
 
 #### Signature Aggregator
-A HTTP client that collects nonces, requests signatures from nodes, and then aggregates and verifies them.
+A Libp2p client that collects nonces, requests signatures from nodes, and then aggregates and verifies them.
 
 To effectively utilize PyFrost in your Threshold Signature Scheme (TSS) network, the following interface classes, used by the above clients, should be implemented:
 - **Data Manager**: Functions for storing and retrieving private nonces and keys.
@@ -51,19 +48,19 @@ To run tests, navigate to the root directory and run the fallowing command:
 
 ## How to Run an Example
 
-To run an example network, open `m` additional terminals for `m` nodes and activate the `venv` in these terminals. Note that `m` is an arbitrary positive number, but it must not exceed 99 due to predefined nodes in the example setup. Then navigate to the `pyfrost/examples/` directory:
+To run an example network, open `m` additional terminals for `m` nodes and activate the `venv` in these terminals. Note that `m` is an arbitrary positive number, but it must not exceed 99 due to predefined nodes in the example setup. Then navigate to the `pyfrost/network/examples/` directory:
 
 ```bash
 (venv) $ cd pyfrost/network/examples/
 ```
 
-First initialize the nodes by typing the following command in `m` terminals:
+First, initialize the nodes by typing the following command in `m` terminals:
 
 ```bash
-(venv) $ python node.py [1-m]
+(venv) $ python node.py [0-m]
 ```
 
-Wait for the node setup to complete, which is indicated by the node API being printed and a message stating with **Serving Flask app 'pyfrost.network_http.node'** for `http` connections.
+Wait for the node setup to complete, which is indicated by the node API being printed and a message stating **Waiting for incoming connections...**
 
 Finally, run the `example.py` script in the last terminal:
 
@@ -86,14 +83,14 @@ The script requires 4 parameters:
 
 The following benchmarks were conducted on an Intel i7-6700HQ with 8 cores and 16GB RAM. (All times are in seconds)
 
-| Benchmark ($t$ of $n$) | DKG Time   | Avg. Time per Node for Nonce Generation | Signing Time |
-| ---------------------- | ---------- | --------------------------------------- | ------------ |
-| 7 of 10                | 0.840 sec  | 0.352 sec                               | 0.135 sec    |
-| 15 of 20               | 5.435 sec  | 0.344 sec                               | 0.380 sec    |
-| 25 of 30               | 14.183 sec | 0.345 sec                               | 0.601 sec    |
+| Benchmark | DKG Time   | Avg. Time per Node for Nonce Generation | Signing Time |
+| --------- | ---------- | --------------------------------------- | ------------ |
+| 7 of 10   | 0.840 sec  | 0.352 sec                               | 0.135 sec    |
+| 15 of 20  | 5.435 sec  | 0.344 sec                               | 0.380 sec    |
+| 25 of 30  | 14.183 sec | 0.345 sec                               | 0.601 sec    |
 
 For the non-local evaluation, we utilized 30 node containers spread across three countries and four cities. Additionally, the Signature Aggregator was configured with dual vCPUs and 8GB of RAM.
 
-| Benchmark ($t$ of $n$) | DKG Time  | Avg. Time per Node for Nonce Generation | Signing Time |
-| ---------------------- | --------- | --------------------------------------- | ------------ |
-| 25 of 30               | 7.400 sec | 1.594 sec                               | 0.725 sec    |
+| Benchmark | DKG Time  | Avg. Time per Node for Nonce Generation | Signing Time |
+| --------- | --------- | --------------------------------------- | ------------ |
+| 25 of 30  | 7.400 sec | 1.594 sec                               | 0.725 sec    |

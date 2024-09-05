@@ -10,6 +10,6 @@ setup(
         "cryptography",
         "aiohttp==3.9.3",
         "bitcoin-utils==0.6.8",
-        "eth_abi==5.1.0"
+        "eth_abi==5.1.0",
     ],
 )
