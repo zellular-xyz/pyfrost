@@ -1,178 +1,185 @@
-from libp2p.crypto.secp256k1 import Secp256k1PublicKey
-from libp2p.peer.id import ID as PeerID
-from libp2p.host.host_interface import IHost
 from typing import List, Dict
-
-from .abstract import NodeInfo
-from .libp2p_base import Libp2pBase, PROTOCOLS_ID, RequestObject
-
-import pprint
-import trio
+from fastecdsa import ecdsa, curve
+from fastecdsa.encoding.sec1 import SEC1Encoder
+from .abstract import NodesInfo
 import logging
 import json
 import uuid
+import asyncio
+import aiohttp
 
 
-class Dkg(Libp2pBase):
-    def __init__(self, address: Dict[str, str], secret: str, node_info: NodeInfo,
-                 max_workers: int = 0, default_timeout: int = 200, host:  IHost = None) -> None:
+async def post_request(url: str, data: Dict, timeout: int = 10):
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=data, timeout=timeout) as response:
+            try:
+                return await response.json()
+            except asyncio.TimeoutError:
+                return {
+                    "status": "TIMEOUT",
+                    "error": "Communication timed out",
+                }
+            except Exception as e:
+                return {
+                    "status": "ERROR",
+                    "error": f"An exception occurred: {type(e).__name__}: {e}",
+                }
 
-        super().__init__(address, secret, host)
 
-        self.node_info: NodeInfo = node_info
-        if max_workers != 0:
-            self.semaphore = trio.Semaphore(max_workers)
-        else:
-            self.semaphore = None
+class Dkg:
+    def __init__(self, nodes_info: NodesInfo, default_timeout: int = 200) -> None:
+        self.nodes_info: NodesInfo = nodes_info
         self.default_timeout = default_timeout
 
-    def __gather_round2_data(self, peer_id: str, data: Dict) -> List:
+    def __gather_round2_data(self, node_id: str, data: Dict) -> List:
         round2_data = []
         for _, round_data in data.items():
-            for entry in round_data['broadcast']:
-                if entry['receiver_id'] == peer_id:
+            for entry in round_data["broadcast"]:
+                if entry["receiver_id"] == node_id:
                     round2_data.append(entry)
         return round2_data
 
-    async def request_dkg(self, threshold: int, party: Dict, node_info: NodeInfo) -> Dict:
-        logging.info(
-            f'Requesting DKG with threshold: {threshold}, party: {party}')
+    async def request_dkg(
+        self, threshold: int, party: List, key_type: str = "ETH"
+    ) -> Dict:
+        logging.info(f"Requesting DKG with threshold: {threshold} and party: {party}")
         dkg_id = str(uuid.uuid4())
 
         if len(party) < threshold:
-            response = {
-                'result': 'FAILED',
-                'dkg_id': None,
-                'response': {}
-            }
+            response = {"result": "FAILED", "dkg_id": None, "response": {}}
             logging.error(
-                f'DKG id {dkg_id} has FAILED due to insufficient number of available nodes')
+                f"DKG id {dkg_id} has FAILED due to insufficient number of available nodes"
+            )
             return response
 
-        call_method = 'round1'
-
-        parameters = {
-            'party': party,
-            'dkg_id': dkg_id,
-            'threshold': threshold,
+        call_method = self.nodes_info.prefix + "/v1/dkg/round1"
+        request_data = {
+            "party": party,
+            "dkg_id": dkg_id,
+            "threshold": threshold,
+            "key_type": key_type,
         }
-        request_object = RequestObject(dkg_id, call_method, parameters)
-        round1_response = {}
-        async with trio.open_nursery() as nursery:
-            for node_id, peer_id in party.items():
-                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
-                nursery.start_soon(self.send, destination_address, peer_id,
-                                   PROTOCOLS_ID[call_method], request_object.get(), round1_response, self.default_timeout, self.semaphore)
+
+        # TODO: Check the sign verifications.
+
+        node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
+        urls = [
+            f'http://{node["host"]}:{node["port"]}' + call_method for node in node_info
+        ]
+        request_tasks = [
+            post_request(url, request_data, self.default_timeout) for url in urls
+        ]
+        responses = await asyncio.gather(*request_tasks)
+        round1_response = dict(zip(party, responses))
 
         logging.debug(
-            f'Round1 dictionary response: \n{pprint.pformat(round1_response)}')
+            f"Round1 dictionary response: \n{json.dumps(round1_response, indent=4)}"
+        )
+
         for response in round1_response.values():
-            if response['status'] == 'SUCCESSFUL':
+            if response["status"] == "SUCCESSFUL":
                 continue
             response = {
-                'result': 'FAILED',
-                'dkg_id': dkg_id,
-                'call_method': call_method,
-                'response': round1_response
+                "result": "FAILED",
+                "dkg_id": dkg_id,
+                "call_method": call_method,
+                "response": round1_response,
             }
-            logging.info(f'DKG request result: {response}')
+            logging.info(f"DKG request result: {response}")
             return response
 
         # TODO: error handling (if verification failed)
         for node_id, data in round1_response.items():
-            data_bytes = json.dumps(data['broadcast']).encode('utf-8')
-            validation = bytes.fromhex(data['validation'])
-            peer_info = self.node_info.lookup_node(node_id)[0]
-            public_key_bytes = bytes.fromhex(
-                peer_info['public_key'])
+            data_bytes = json.dumps(data["broadcast"], sort_keys=True).encode("utf-8")
+            signature = data["validation"]
+            public_key_code = self.nodes_info.lookup_node(node_id)["public_key"]
+            public_key = SEC1Encoder.decode_public_key(
+                bytes.fromhex(hex(public_key_code).replace("x", "")), curve.secp256k1
+            )
+            verify_result = ecdsa.verify(
+                signature, data_bytes, public_key, curve=curve.secp256k1
+            )
+            logging.debug(f"Verification of sent data from {node_id}: {verify_result}")
 
-            public_key = Secp256k1PublicKey.deserialize(public_key_bytes)
-            logging.debug(
-                f'Verification of sent data from {node_id}: {public_key.verify(data_bytes, validation)}')
-
-        call_method = 'round2'
-        parameters = {
-            'dkg_id': dkg_id,
-            'broadcasted_data': round1_response
-        }
-        request_object = RequestObject(dkg_id, call_method, parameters)
-
-        round2_response = {}
-        async with trio.open_nursery() as nursery:
-            for node_id, peer_id in party.items():
-                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
-                nursery.start_soon(self.send, destination_address, peer_id,
-                                   PROTOCOLS_ID[call_method], request_object.get(), round2_response, self.default_timeout, self.semaphore)
+        call_method = self.nodes_info.prefix + "/v1/dkg/round2"
+        request_data = {"dkg_id": dkg_id, "broadcasted_data": round1_response}
+        node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
+        urls = [
+            f'http://{node["host"]}:{node["port"]}' + call_method for node in node_info
+        ]
+        request_tasks = [
+            post_request(url, request_data, self.default_timeout) for url in urls
+        ]
+        responses = await asyncio.gather(*request_tasks)
+        round2_response = dict(zip(party, responses))
 
         logging.debug(
-            f'Round2 dictionary response: \n{pprint.pformat(round2_response)}')
+            f"Round2 dictionary response: \n{json.dumps(round2_response, indent=4)}"
+        )
 
         for response in round2_response.values():
-            if response['status'] == 'SUCCESSFUL':
+            if response["status"] == "SUCCESSFUL":
                 continue
             response = {
-                'result': 'FAILED',
-                'dkg_id': dkg_id,
-                'call_method': call_method,
-                'response': round2_response,
+                "result": "FAILED",
+                "dkg_id": dkg_id,
+                "call_method": call_method,
+                "response": round2_response,
             }
-            logging.info(f'DKG request result: {response}')
+            logging.info(f"DKG request result: {json.dumps(response, indent=4)}")
             return response
 
-        call_method = 'round3'
-
-        round3_response = {}
-
-        async with trio.open_nursery() as nursery:
-            for node_id, peer_id in party.items():
-                parameters = {
-                    'dkg_id': dkg_id,
-                    'send_data': self.__gather_round2_data(node_id, round2_response)
-                }
-                request_object = RequestObject(dkg_id, call_method, parameters)
-
-                destination_address = self.node_info.lookup_node(peer_id, node_id)[0]
-                nursery.start_soon(self.send, destination_address, peer_id,
-                                   PROTOCOLS_ID[call_method], request_object.get(), round3_response, self.default_timeout, self.semaphore)
+        call_method = self.nodes_info.prefix + "/v1/dkg/round3"
+        request_tasks = []
+        for node_id in party:
+            request_data = {
+                "dkg_id": dkg_id,
+                "send_data": self.__gather_round2_data(node_id, round2_response),
+            }
+            node_info = self.nodes_info.lookup_node(node_id)
+            url = f'http://{node_info["host"]}:{node_info["port"]}' + call_method
+            request_tasks.append(post_request(url, request_data, self.default_timeout))
+        responses = await asyncio.gather(*request_tasks)
+        round3_response = dict(zip(party, responses))
 
         logging.debug(
-            f'Round3 dictionary response: \n{pprint.pformat(round3_response)}')
+            f"Round3 dictionary response: \n{json.dumps(round3_response, indent=4)}"
+        )
 
         for response in round3_response.values():
-            if response['status'] == 'SUCCESSFUL':
+            if response["status"] == "SUCCESSFUL":
                 continue
             response = {
-                'result': 'FAILED',
-                'dkg_id': dkg_id,
-                'call_method': call_method,
-                'round1_response': round1_response,
-                'round2_response': round2_response,
-                'response': round3_response
+                "result": "FAILED",
+                "call_method": call_method,
+                "round1_response": round1_response,
+                "round2_response": round2_response,
+                "response": round3_response,
             }
-            logging.info(f'DKG request result: {response}')
+            logging.info(f"DKG request result: {response}")
             return response
 
         for id1, data1 in round3_response.items():
             for id2, data2 in round3_response.items():
                 # TODO: handle this assertion
-                assert data1['data']['dkg_public_key'] == data2['data']['dkg_public_key'], \
-                    f'The DKG key of node {id1} is not consistance with the DKG key of node {id2}'
+                assert (
+                    data1["data"]["dkg_public_key"] == data2["data"]["dkg_public_key"]
+                ), f"The DKG key of node {id1} is not consistance with the DKG key of node {id2}"
 
-        public_key = list(round3_response.values())[
-            0]['data']['dkg_public_key']
+        public_key = list(round3_response.values())[0]["data"]["dkg_public_key"]
         public_shares = {}
         validations = {}
         for id, data in round3_response.items():
-            public_shares[self.node_info.lookup_node(id)[1]] = data['data']['public_share']
-            validations[self.node_info.lookup_node(id)[1]] = data['validation']
+            public_shares[id] = data["data"]["public_share"]
+            validations[id] = data["validation"]
 
         response = {
-            'dkg_id': dkg_id,
-            'public_key': public_key,
-            'public_shares': public_shares,
-            'party': party,
-            'validations': validations,
-            'result': 'SUCCESSFUL'
+            "public_key": public_key,
+            "public_shares": public_shares,
+            "party": party,
+            "validations": validations,
+            "key_type": key_type,
+            "result": "SUCCESSFUL",
         }
-        logging.info(f'DKG response: {response}')
+        logging.info(f"DKG response: {response}")
         return response

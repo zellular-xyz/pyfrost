@@ -1,29 +1,40 @@
 from abc import ABC, abstractmethod
-from libp2p.typing import TProtocol
-from typing import Dict, List
+from typing import Dict, List, Any
 
 
 class DataManager(ABC):
     @abstractmethod
-    def get_nonces(self) -> List:
+    def get_nonce(self, nonce_public: str) -> List:
         pass
 
     @abstractmethod
-    def set_nonces(self, nonces_list) -> None:
+    def set_nonce(self, nonce_public: str, nonce_private: str) -> None:
         pass
 
     @abstractmethod
-    def set_key(self,  key, value) -> None:
+    def remove_nonce(self, nonce_public: str) -> None:
+        pass
+
+    @abstractmethod
+    def set_key(self, key, value) -> None:
         pass
 
     @abstractmethod
     def get_key(self, key):
         pass
 
-
-class NodeInfo(ABC):
     @abstractmethod
-    def lookup_node(self, peer_id: str, node_id: str = None):
+    def remove_key(self, key):
+        pass
+
+
+class NodesInfo(ABC):
+    @property
+    def prefix(self):
+        pass
+
+    @abstractmethod
+    def lookup_node(self, node_id: str):
         pass
 
     @abstractmethod
@@ -34,7 +45,7 @@ class NodeInfo(ABC):
 class Validators(ABC):
     @staticmethod
     @abstractmethod
-    def caller_validator(sender_id: str, protocol: TProtocol):
+    def caller_validator(ip: str, request: Any):
         pass
 
     @staticmethod
