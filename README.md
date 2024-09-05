@@ -14,13 +14,13 @@ PyFrost implements the cryptographic functions of the FROST protocol and include
 The network package includes the implementation of the following components:
 
 #### Node
-A Libp2p client that facilitates the three rounds of the Distributed Key Generation (DKG) process, as well as nonce creation and signing methods.
+A HTTP server that facilitates the three rounds of the Distributed Key Generation (DKG) process, as well as nonce creation and signing methods.
 
 #### Distributed Key Generator
 A Libp2p client responsible for initiating the DKG process through the node.
 
 #### Signature Aggregator
-A Libp2p client that collects nonces, requests signatures from nodes, and then aggregates and verifies them.
+A HTTP client that collects nonces, requests signatures from nodes, and then aggregates and verifies them.
 
 To effectively utilize PyFrost in your Threshold Signature Scheme (TSS) network, the following interface classes, used by the above clients, should be implemented:
 - **Data Manager**: Functions for storing and retrieving private nonces and keys.
@@ -57,23 +57,13 @@ To run an example network, open `m` additional terminals for `m` nodes and activ
 (venv) $ cd pyfrost/network/examples/
 ```
 
-For http network example, change directory to `http`:
-```bash
-(venv) $ cd http/
-```
-
-And for libp2p network example, change directory to `libp2p`:
-```bash
-(venv) $ cd libp2p/
-```
-
-In any of the `libp2p` or `http` direcotories, first initialize the nodes by typing the following command in `m` terminals:
+First initialize the nodes by typing the following command in `m` terminals:
 
 ```bash
 (venv) $ python node.py [1-m]
 ```
 
-Wait for the node setup to complete, which is indicated by the node API being printed and a message stating **Waiting for incoming connections...** for `libp2p` connections and **Serving Flask app 'pyfrost.network_http.node'** for `http` connections.
+Wait for the node setup to complete, which is indicated by the node API being printed and a message stating with **Serving Flask app 'pyfrost.network_http.node'** for `http` connections.
 
 Finally, run the `example.py` script in the last terminal:
 
