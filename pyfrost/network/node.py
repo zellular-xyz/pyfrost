@@ -180,8 +180,8 @@ class Node:
         nonce_e_private = self.data_manager.get_nonce(str(nonce_e_public))
         nonce = {"nonce_d": nonce_d_private, "nonce_e": nonce_e_private}
         result["signature_data"] = key.sign(nonces_dict, result["hash"], nonce)
-        # self.data_manager.remove_nonce(str(nonce_d_public))
-        # self.data_manager.remove_nonce(str(nonce_e_public))
+        self.data_manager.remove_nonce(str(nonce_d_public))
+        self.data_manager.remove_nonce(str(nonce_e_public))
 
         result["status"] = "SUCCESSFUL"
         result["request_id"] = request_id
