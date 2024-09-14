@@ -31,8 +31,7 @@ def generate_privates_and_nodes_info(number: int = 100):
         )
         nodes_info_dict[str(i + 1)] = {
             "public_key": compressed_pub_key,
-            "host": "127.0.0.1",
-            "port": str(5000 + i),
+            "socket": f"http://127.0.0.1:{str(5000 + i)}",
         }
         privates_list.append(new_private)
     return privates_list, nodes_info_dict

@@ -2,6 +2,7 @@ import os
 import logging
 import sys
 from flask import Flask
+from urllib.parse import urlparse
 from pyfrost.network.node import Node
 from abstracts import NodesInfo, NodeDataManager, NodeValidators
 from config import generate_privates_and_nodes_info
@@ -22,7 +23,8 @@ def run_node(node_number: int) -> None:
     node_info = nodes_info.lookup_node(str(node_number))
     app = Flask(__name__)
     app.register_blueprint(node.blueprint, url_prefix="/pyfrost")
-    app.run(host=node_info["host"], port=int(node_info["port"]), debug=True)
+    parsed_url = urlparse(node_info["socket"])
+    app.run(host="0.0.0.0", port=int(parsed_url.port), debug=True)
 
 
 if __name__ == "__main__":

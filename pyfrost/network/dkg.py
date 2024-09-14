@@ -64,7 +64,7 @@ class Dkg:
 
         node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
         urls = [
-            f'http://{node["host"]}:{node["port"]}' + call_method for node in node_info
+            f'{node["socket"]}' + call_method for node in node_info
         ]
         request_tasks = [
             post_request(url, request_data, self.default_timeout) for url in urls
@@ -105,7 +105,7 @@ class Dkg:
         request_data = {"dkg_id": dkg_id, "broadcasted_data": round1_response}
         node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
         urls = [
-            f'http://{node["host"]}:{node["port"]}' + call_method for node in node_info
+            f'{node["socket"]}' + call_method for node in node_info
         ]
         request_tasks = [
             post_request(url, request_data, self.default_timeout) for url in urls
@@ -137,7 +137,7 @@ class Dkg:
                 "send_data": self.__gather_round2_data(node_id, round2_response),
             }
             node_info = self.nodes_info.lookup_node(node_id)
-            url = f'http://{node_info["host"]}:{node_info["port"]}' + call_method
+            url = f'{node_info["socket"]}' + call_method
             request_tasks.append(post_request(url, request_data, self.default_timeout))
         responses = await asyncio.gather(*request_tasks)
         round3_response = dict(zip(party, responses))

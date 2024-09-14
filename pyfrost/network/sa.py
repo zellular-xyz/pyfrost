@@ -68,7 +68,7 @@ class SA:
         }
         node_info = [self.nodes_info.lookup_node(node_id) for node_id in party]
         urls = [
-            f'http://{node["host"]}:{node["port"]}' + call_method for node in node_info
+            f'{node["socket"]}' + call_method for node in node_info
         ]
         request_tasks = [
             post_request(url, request_data, self.default_timeout) for url in urls
@@ -97,7 +97,7 @@ class SA:
         }
         node_info = [self.nodes_info.lookup_node(node_id) for node_id in sign_party]
         urls = [
-            f'http://{node["host"]}:{node["port"]}' + call_method for node in node_info
+            f'{node["socket"]}' + call_method for node in node_info
         ]
         request_tasks = [
             sign_request(url, dkg_key, request_data, self.default_timeout)
