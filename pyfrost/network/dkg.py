@@ -10,20 +10,20 @@ import aiohttp
 
 
 async def post_request(url: str, data: Dict, timeout: int = 10):
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=data, timeout=timeout) as response:
-            try:
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=data, timeout=timeout) as response:
                 return await response.json()
-            except asyncio.TimeoutError:
-                return {
-                    "status": "TIMEOUT",
-                    "error": "Communication timed out",
-                }
-            except Exception as e:
-                return {
-                    "status": "ERROR",
-                    "error": f"An exception occurred: {type(e).__name__}: {e}",
-                }
+    except asyncio.TimeoutError:
+        return {
+            "status": "TIMEOUT",
+            "error": "Request timed out while making the request",
+        }
+    except Exception as e:
+        return {
+            "status": "ERROR",
+            "error": f"An unexpected error occurred: {type(e).__name__}: {e}",
+        }
 
 
 class Dkg:
