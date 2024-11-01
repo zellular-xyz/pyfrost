@@ -111,6 +111,7 @@ class SA:
         )
 
         sample_result = []
+        signature_data_from_nodes = {}
         signs = []
         aggregated_public_nonces = []
         str_message = None
@@ -123,6 +124,7 @@ class SA:
                 "aggregated_public_nonce"
             )
             sample_result.append(data)
+            signature_data_from_nodes[node_id] = data.get('data', {})
             if _hash and str_message is None:
                 str_message = _hash
             if _signature_data:
@@ -174,6 +176,7 @@ class SA:
             aggregated_sign["result"] = "SUCCESSFUL"
             aggregated_sign["request_id"] = request_id
             aggregated_sign["sa_data"] = sa_data
+            aggregated_sign["signature_data_from_node"] = signature_data_from_nodes
             logging.info(f'Aggregated sign result: {aggregated_sign["result"]}')
         else:
             aggregated_sign["signature_data"] = sample_result
