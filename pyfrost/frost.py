@@ -486,10 +486,7 @@ def verify_group_signature(aggregated_signature: Dict) -> bool:
     message = aggregated_signature["message"]
     # Calculate the challenge
     if aggregated_signature["key_type"] == "ETH":
-        challenge = eth_challenge(
-            group_pub_key, message, pub_decompress(aggregated_signature["public_nonce"])
-        )
-        return eth_verify_group_sign(challenge, aggregated_signature)
+        return eth_verify_group_sign(group_pub_key, message, aggregated_signature)
 
     elif aggregated_signature["key_type"] == "BTC":
         return btc_verify_group_signature(aggregated_signature)

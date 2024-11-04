@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="pyfrost",
-    version="0.1",
+    version="0.2.0",
     packages=find_packages(exclude=["pyfrost/tests", "pyfrost/example"]),
     install_requires=[
         "fastecdsa==2.3.2",

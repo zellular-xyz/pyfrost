@@ -14,7 +14,7 @@ from pyfrost.crypto_utils import (
 
 
 def eth_challenge(
-    group_pub_key: Dict, message_hex: str, aggregated_public_nonce: Point
+    group_pub_key: Dict, message_hex: str, aggregated_nonce: str
 ) -> bytes:
     packed_data = encode_packed(
         ["bytes32", "uint8", "bytes32", "address"],
@@ -22,7 +22,7 @@ def eth_challenge(
             bytes.fromhex(group_pub_key["x"].replace("0x", "")),
             group_pub_key["y_parity"],
             bytes.fromhex(message_hex),
-            pub_to_addr(aggregated_public_nonce),
+            aggregated_nonce,
         ],
     )
     return sha256(packed_data).digest()
@@ -46,7 +46,10 @@ def eth_verify_single_sign(coef, challenge, public_nonce, signature_data):
     return point1 == point2
 
 
-def eth_verify_group_sign(challenge, aggregated_signature):
+def eth_verify_group_sign(group_pub_key, message, aggregated_signature):
+    challenge = eth_challenge(
+        group_pub_key, message, aggregated_signature["nonce"]
+    )
     challenge_int = int.from_bytes(challenge, "big")
     # Calculate the point
     point = (aggregated_signature["signature"] * ecurve.G) + (
