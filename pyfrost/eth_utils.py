@@ -14,8 +14,10 @@ from pyfrost.crypto_utils import (
 
 
 def eth_challenge(
-    group_pub_key: Dict, message_hex: str, aggregated_nonce: str
+    group_pub_key: Dict, message_hex: str, aggregated_nonce: str | Point
 ) -> bytes:
+    if isinstance(aggregated_nonce, Point):
+        aggregated_nonce = pub_to_addr(aggregated_nonce)
     packed_data = encode_packed(
         ["bytes32", "uint8", "bytes32", "address"],
         [
