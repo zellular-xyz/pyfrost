@@ -81,6 +81,7 @@ class SA:
 	async def request_signature(
 		self, dkg_key: Dict, nonces_dict: Dict, sa_data: Dict, sign_party: List
 	) -> Dict:
+
 		call_method = self.nodes_info.prefix + "/v1/sign"
 		if not set(sign_party).issubset(set(dkg_key["party"])):
 			response = {"result": "FAILED", "signatures": None}
@@ -126,17 +127,16 @@ class SA:
 			return response
 
 		# =============== aggregate final signature ===============
-		selecteds = ["1", "2", "3"] #sign_party[:dkg_key["threshold"]];
 
 		commitments_map = dict(zip(
-			selecteds,
-			[nonces_dict[id] for id in selecteds]
+			sign_party,
+			[nonces_dict[id] for id in sign_party]
 		))
 		signature_shares = dict(zip(
-			selecteds,
-			[signatures[id]["signature_data"] for id in selecteds]
+			sign_party,
+			[signatures[id]["signature_data"] for id in sign_party]
 		))
-		hash = signatures[selecteds[0]]["hash"]
+		hash = signatures[sign_party[0]]["hash"]
 
 		aggregated_sign = frost.aggregate(
 			key_type=dkg_key["key_type"],
