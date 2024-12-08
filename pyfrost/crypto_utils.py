@@ -382,3 +382,17 @@ def decrypt(data: str, key: bytes) -> str:
     key = base64.b64encode(key)
     fernet = Fernet(key)
     return fernet.decrypt(data).decode()
+
+def encrypt_with_joint_key(data: str, secret: int, receiver_pubkey: str) -> str:
+	encryption_joint_key = pub_to_code(
+		secret * code_to_pub(receiver_pubkey)
+	)
+	encryption_key = generate_hkdf_key(encryption_joint_key)
+	return encrypt(data, encryption_key)
+
+def decrypt_with_joint_key(data: str, secret: int, sender_pubkey: str) -> str:
+	encryption_joint_key = pub_to_code(
+		secret * code_to_pub(sender_pubkey)
+	)
+	encryption_key = generate_hkdf_key(encryption_joint_key)
+	return decrypt(data, encryption_key)

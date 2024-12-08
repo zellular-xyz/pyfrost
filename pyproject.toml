@@ -1,0 +1,20 @@
+[project]
+name = "pyfrost"
+version = "0.2.1"
+description = ""  # Add a description if needed
+authors = [{ name = "Your Name", email = "your.email@example.com" }]
+dependencies = [
+    "fastecdsa==2.3.2",
+    "Flask==3.0.0",
+    "cryptography",
+    "aiohttp==3.9.3",
+    "bitcoin-utils==0.6.8",
+    "eth_abi==5.1.0",
+    "web3==7.6.0",
+    # "frost_lib @ git+https://github.com/sadeghte/frost-lib.git@main"
+    "frost_lib @ file:///home/sadegh/Projects/zellular/frost-lib"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
