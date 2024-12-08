@@ -1,47 +1,9 @@
 from fastecdsa import keys
 from hashlib import sha256
 import frost_lib;
-
-from .btc_utils import (
-	btc_challenge,
-	calculate_tweaked,
-	btc_generate_signature_share,
-	btc_verify_single_sign,
-	btc_verify_group_signature,
-)
 from . import crypto_utils
-from .crypto_utils import (
-	pub_to_code,
-	ecurve,
-	schnorr_sign,
-	stringify_signature,
-	Polynomial,
-	schnorr_verify,
-	code_to_pub,
-	generate_hkdf_key,
-	encrypt,
-	decrypt,
-	calc_poly_point,
-	pub_compress,
-	pub_to_addr,
-	lagrange_coef,
-	taproot_tweak_pubkey,
-	generate_random_private,
-	N,
-	pub_decompress,
-	complaint_sign,
-)
-from typing import List, Dict, Tuple, TypedDict, Literal
-import json
-from fastecdsa.point import Point
-
-from .eth_utils import (
-	eth_challenge,
-	eth_generate_signature_share,
-	eth_verify_single_sign,
-	eth_verify_group_sign,
-)
-
+from typing import List, Dict, Tuple, Literal
+import json, copy
 
 KeyType = Literal ["ed25519", "secp256k1"]
 
@@ -167,7 +129,7 @@ class KeyGen:
 def keys_to_frost(data: dict, crypto_module_type: KeyType) -> dict:
 	result = {}
 	for id in list(data.keys()):
-		result[id_to_frost(crypto_module_type, id)] = data[id]
+		result[id_to_frost(crypto_module_type, id)] = copy.deepcopy(data[id])
 	return result;
 
 def make_signature_share(
@@ -243,6 +205,8 @@ def aggregate(key_type, message, commitments_map: dict, signature_shares: dict, 
 	);
 
 	signature_shares = keys_to_frost(signature_shares, key_type)
+
+	pubkey_package = copy.deepcopy(pubkey_package)
 	pubkey_package["verifying_shares"] = keys_to_frost(pubkey_package["verifying_shares"], key_type)
 	
 	return module.aggregate(
@@ -252,5 +216,6 @@ def aggregate(key_type, message, commitments_map: dict, signature_shares: dict, 
 	)
 
 def verify_group_signature(key_type, group_signature, message, pubkey_package):
+	pubkey_package = copy.deepcopy(pubkey_package);
 	pubkey_package["verifying_shares"] = keys_to_frost(pubkey_package["verifying_shares"], key_type);
 	return get_module(key_type).verify_group_signature(group_signature, message, pubkey_package)

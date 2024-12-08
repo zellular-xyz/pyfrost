@@ -2,7 +2,7 @@ from pyfrost.network.sa import SA
 from pyfrost.network.dkg import Dkg
 from typing import List
 from abstracts import NodesInfo
-import logging, json
+import logging, json, random
 import time
 import timeit
 import sys
@@ -35,22 +35,27 @@ async def run_sample(
 
 	dkg_public_key = dkg_key["public_key"]
 	logging.info(f"dkg key: {dkg_key}")
-	
-	# Requesting nonce generation
-	nonces = {}
-	nonces_response = await sa.request_nonces(all_nodes, dkg_public_key)
-	
-	for node_id in all_nodes:
-		nonces.setdefault(node_id, [])
-		nonces[node_id] += nonces_response[node_id]["commitments"]
 
+	# for each signature we select a random subset
+	# only nonce[0] will be tested
 	for i in range(num_signs):
-		logging.info(f"Get signature {i} with DKG public key {dkg_public_key}")
+		# select random partners
+		selected_party = dkg_key["party"][:]
+		random.shuffle(selected_party)
+		selected_party = selected_party[:threshold]
+	
+		# Requesting nonce generation
+		nonces = {}
+		nonces_response = await sa.request_nonces(selected_party, dkg_public_key, 1)
+		
+		for node_id in selected_party:
+			nonces.setdefault(node_id, [])
+			nonces[node_id] += nonces_response[node_id]["commitments"]
 
-		dkg_party: List = dkg_key["party"]
+		logging.info(f"Get signature {i} with DKG public key {dkg_public_key}")
 		
 		nonces_dict = {}
-		for node_id in dkg_party:
+		for node_id in selected_party:
 			nonce = nonces[node_id].pop()
 			nonces_dict[node_id] = nonce
 
@@ -58,7 +63,7 @@ async def run_sample(
 		sa_data = {"data": "Hi there!"}
 
 		signature = await sa.request_signature(
-			dkg_key, nonces_dict, sa_data, dkg_key["party"]
+			dkg_key, nonces_dict, sa_data, selected_party
 		)
 		then = timeit.default_timer()
 
