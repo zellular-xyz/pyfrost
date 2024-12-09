@@ -6,6 +6,7 @@ from typing import Dict
 from fastecdsa.encoding.sec1 import SEC1Encoder
 from fastecdsa import ecdsa, curve
 from .abstract import NodesInfo, DataManager
+from .. import frost
 import json
 import logging
 import types
@@ -127,12 +128,39 @@ class Node:
 			logging.debug(f"Verification of sent data from {node_id}: {verify_result}")
 			
 			broadcasted_data[node_id] = data["broadcast"]
-		round2_data = self.key_gens[dkg_id].round2(broadcasted_data)
-		result = {
-			"send_to": round2_data,
-			"status": "SUCCESSFUL",
-		}
-		return result
+		try:
+			round2_data = self.key_gens[dkg_id].round2(broadcasted_data)
+			result = {
+				"send_to": round2_data,
+				"status": "SUCCESSFUL",
+			}
+			return result
+		except Exception as e:
+			if "proof of knowledge is not valid" in str(e):
+				# find malicious node
+				dkg_party = self.key_gens[dkg_id].partners
+				key_type = self.key_gens[dkg_id].key_type
+				malicious = []
+				for id in dkg_party:
+					if id == self.node_id:
+						continue;
+					proof_verified = frost.verify_proof_of_knowledge(
+						key_type=key_type, 
+						id=id,
+						commitments=whole_broadcasted_data[id]['broadcast']['commitment'],
+						signature=whole_broadcasted_data[id]['broadcast']['proof_of_knowledge']
+					)
+					if not proof_verified:
+						malicious.append(id);
+				return {
+					"status": "MALICIOUS",
+					"malicious": {
+						"reason": "Invalid DKG round1 proof_of_nowledge",
+						"partners": malicious
+					}
+				}
+			else:
+				raise e;
 
 	@request_handler
 	def round3(self):
@@ -149,7 +177,33 @@ class Node:
 			)
 			send_data[sender] = json.loads(dec)
 
-		round3_data = self.key_gens[dkg_id].round3(send_data)
+		try:
+			round3_data = self.key_gens[dkg_id].round3(send_data)
+		except Exception as e:
+			if "Invalid secret share" in str(e):
+				key_gen = self.key_gens[dkg_id]
+				malicious = []
+				for sender in key_gen.partners:
+					if sender == self.node_id:
+						continue
+
+					verified = frost.verify_dkg_secret_share(
+						key_type=key_gen.key_type,
+						id=self.node_id,
+						secret_share=send_data[sender]["signing_share"],
+						commitment=key_gen.round1_rec_packages[sender]["commitment"]
+					)
+
+					if not verified:
+						malicious.append(sender);
+				return {
+					"status": "MALICIOUS",
+					"reason": str(e),
+					"partners": malicious,
+				}
+			else:
+				raise e;
+	
 		key_type = self.key_gens[dkg_id].key_type
 		if round3_data["status"] == "COMPLAINT":
 			if dkg_id in self.key_gens:

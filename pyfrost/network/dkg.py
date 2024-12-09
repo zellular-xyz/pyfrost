@@ -51,8 +51,6 @@ class Dkg:
 		self, threshold: int, party: List, 
 		key_type: KeyType = "secp256k1"
 	) -> Dict:
-		f_module = get_module(key_type)
-
 		logging.info(f"Requesting DKG with threshold: {threshold} and party: {party}")
 		dkg_id = str(uuid.uuid4())
 
@@ -132,6 +130,14 @@ class Dkg:
 		for response in round2_response.values():
 			if response["status"] == "SUCCESSFUL":
 				continue
+
+			# detect malicious
+			malicious = [res for res in round2_response.values() if res["status"] == "MALICIOUS"]
+			if len(malicious) >= 0:
+				# TODO: report malicious behaviour
+				pass;
+			
+			# return failure response
 			response = {
 				"result": "FAILED",
 				"dkg_id": dkg_id,
@@ -167,6 +173,13 @@ class Dkg:
 		for response in round3_response.values():
 			if response["status"] == "SUCCESSFUL":
 				continue
+
+			# detect malicious
+			malicious = [res for res in round2_response.values() if res["status"] == "MALICIOUS"]
+			if len(malicious) >= 0:
+				# TODO: report malicious behaviour
+				pass;
+			
 			response = {
 				"result": "FAILED",
 				"call_method": call_method,

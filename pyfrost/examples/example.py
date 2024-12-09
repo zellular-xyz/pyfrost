@@ -33,6 +33,9 @@ async def run_sample(
 	logging.info(f"Requesting DKG takes: {then - now} seconds.")
 	logging.info(f'The DKG result is {dkg_key["result"]}')
 
+	if dkg_key["result"] == "FAILED":
+		return;
+
 	dkg_public_key = dkg_key["public_key"]
 	logging.info(f"dkg key: {dkg_key}")
 

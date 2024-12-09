@@ -62,11 +62,20 @@ class KeyGen:
 			self.threshold,
 		)
 
+		# # TODO: just for dkg malicious detection test. remove it =========
+		# if self.node_id == "3":
+		# 	print("========================= Malignant Behaviour ===============================")
+		# 	self.round1_result["package"]["proof_of_knowledge"] = self.round1_result["package"]["proof_of_knowledge"][:-1] + "0"
+		# # ================================================================
+
 		self.status = "ROUND1"
 		return self.round1_result["package"]
 
 	def round2(self, round1_packages: dict[str, frost_lib.types.Part1PackageT]) -> list[dict]:
 		f_module = get_module(self.key_type);
+		
+		# store for later use
+		self.round1_rec_packages = round1_packages;
 
 		# convert normal id into frost ID
 		rec_pkgs = {}
@@ -74,16 +83,22 @@ class KeyGen:
 			if id == self.node_id:
 				continue;
 			rec_pkgs[f_module.num_to_id(int(id))] = round1_packages[id]
-		
-		# store for later use
-		self.round1_rec_packages = rec_pkgs;
+
 		# call round 2
 		self.round2_result = get_module(self.key_type).dkg_part2(self.round1_result["secret_package"], rec_pkgs)
 		result_data = {};
 		for id in self.partners:
 			if id == self.node_id:
 				continue;
+
 			frost_id = id_to_frost(self.key_type, id)
+			
+			# # TODO: just for dkg malicious detection test. remove it =========
+			# if self.node_id == "3" and id == "1":
+			# 	print("========================= Malignant Behaviour ===============================")
+			# 	self.round2_result["packages"][frost_id]["signing_share"] = self.round2_result["packages"][frost_id]["signing_share"][:-1] + "0"
+			# # ================================================================
+
 			result_data[id] = crypto_utils.encrypt_with_joint_key(
 				json.dumps(self.round2_result["packages"][frost_id], sort_keys=True),
 				self.node_secret,
@@ -99,10 +114,13 @@ class KeyGen:
 			frost_id = get_module(self.key_type).num_to_id(int(sender));
 			r2pkgs[frost_id] = data;
 		
+		r1_pkgs = copy.deepcopy(self.round1_rec_packages)
+		r1_pkgs = keys_to_frost(r1_pkgs, self.key_type)
+		
 		# call native DKG part3
 		self.round3_result = get_module(self.key_type).dkg_part3(
 			   self.round2_result["secret_package"],
-			   self.round1_rec_packages,
+			   r1_pkgs,
 			   r2pkgs
 		)
 
@@ -131,6 +149,20 @@ def keys_to_frost(data: dict, crypto_module_type: KeyType) -> dict:
 	for id in list(data.keys()):
 		result[id_to_frost(crypto_module_type, id)] = copy.deepcopy(data[id])
 	return result;
+
+def verify_proof_of_knowledge(key_type: KeyType, id, commitments, signature):
+	return get_module(key_type).verify_proof_of_knowledge(
+		id_to_frost(key_type, id), 
+		commitments, 
+		signature
+	)
+
+def verify_dkg_secret_share(key_type: KeyType, id, secret_share, commitment):
+	return get_module(key_type).dkg_verify_secret_share(
+		id_to_frost(key_type, id), 
+		secret_share, 
+		commitment
+	);
 
 def make_signature_share(
 		key_type: KeyType,
