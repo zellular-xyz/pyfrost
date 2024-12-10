@@ -72,7 +72,7 @@ async def run_sample(
 		then = timeit.default_timer()
 
 		logging.info(f"Requesting signature {i} takes {then - now} seconds")
-		logging.info(f"Signature data: {signature}")
+		logging.info(f"Signature data: {json.dumps(signature, indent=4)}")
 
 
 if __name__ == "__main__":

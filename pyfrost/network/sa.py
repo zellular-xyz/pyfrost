@@ -117,13 +117,13 @@ class SA:
 		# check malicious behaviour
 		response = {"result": "SUCCESSFUL", "signatures": None}
 		for data in signatures.values():
-			if data["status"] == "MALICIOUS":
+			if not data["status"] == "SUCCESSFUL":
 				response["result"] = "FAILED"
 				break
 
 		if response["result"] == "FAILED":
 			response = {"result": "FAILED", "signatures": signatures}
-			logging.info(f"Signature response: {response}")
+			logging.info(f"Signature response: {json.dumps(response, indent=4)}")
 			return response
 
 		# =============== aggregate final signature ===============

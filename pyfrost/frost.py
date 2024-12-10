@@ -141,11 +141,20 @@ def make_signature_share(
 	
 	signing_package = frost_module.signing_package_new(nonces_commitments, message);
 
-	return frost_module.round2_sign(
+	signature = frost_module.round2_sign(
 			signing_package,
 			nonce,
 			key_package
 		)
+			
+	# # TODO: just for sign malicious detection test. remove it =========
+	# identifier = key_package["identifier"]
+	# if int(identifier, 16) == 3:
+	# 	print("========================= Malignant Behaviour ===============================")
+	# 	signature["share"] = signature["share"][:-1] + "0"
+	# # ================================================================
+
+	return signature;
 
 def verify_signature_share(
 	key_type: KeyType, 
