@@ -10,13 +10,6 @@ KeyType = Literal ["ed25519", "secp256k1"]
 def get_module(name):
 	return getattr(frost_lib, name)
 
-def id_to_frost(key_type: KeyType, id: str):
-	return get_module(key_type).num_to_id(int(id));
-
-def ids_to_frost(key_type: KeyType, ids: list[str]):
-	module = get_module(key_type)
-	return [module.num_to_id(int(id)) for id in ids]
-
 class KeyGen:
 	dkg_id: str
 	key_type: KeyType
@@ -57,7 +50,7 @@ class KeyGen:
 	def round1(self) -> Dict:
 		f_module = get_module(self.key_type)
 		self.round1_result = f_module.dkg_part1(
-			f_module.num_to_id(int(self.node_id)),
+			self.node_id,
 			len(self.partners),
 			self.threshold,
 		)
@@ -82,7 +75,7 @@ class KeyGen:
 		for id in self.partners:
 			if id == self.node_id:
 				continue;
-			rec_pkgs[f_module.num_to_id(int(id))] = round1_packages[id]
+			rec_pkgs[id] = round1_packages[id]
 
 		# call round 2
 		self.round2_result = get_module(self.key_type).dkg_part2(self.round1_result["secret_package"], rec_pkgs)
@@ -90,76 +83,49 @@ class KeyGen:
 		for id in self.partners:
 			if id == self.node_id:
 				continue;
-
-			frost_id = id_to_frost(self.key_type, id)
 			
 			# # TODO: just for dkg malicious detection test. remove it =========
 			# if self.node_id == "3" and id == "1":
 			# 	print("========================= Malignant Behaviour ===============================")
-			# 	self.round2_result["packages"][frost_id]["signing_share"] = self.round2_result["packages"][frost_id]["signing_share"][:-1] + "0"
+			# 	self.round2_result["packages"][id]["signing_share"] = self.round2_result["packages"][id]["signing_share"][:-1] + "0"
 			# # ================================================================
 
 			result_data[id] = crypto_utils.encrypt_with_joint_key(
-				json.dumps(self.round2_result["packages"][frost_id], sort_keys=True),
+				json.dumps(self.round2_result["packages"][id], sort_keys=True),
 				self.node_secret,
 				self.partners_pub_keys[id]
 			)
 		self.status = "ROUND2"
 		return result_data
 
-	def round3(self, round2_packages) -> Dict:
-		# convert node id into frost ID
-		r2pkgs = {}
-		for sender, data in round2_packages.items():
-			frost_id = get_module(self.key_type).num_to_id(int(sender));
-			r2pkgs[frost_id] = data;
-		
-		r1_pkgs = copy.deepcopy(self.round1_rec_packages)
-		r1_pkgs = keys_to_frost(r1_pkgs, self.key_type)
-		
+	def round3(self, round2_packages) -> Dict:				
 		# call native DKG part3
 		self.round3_result = get_module(self.key_type).dkg_part3(
 			   self.round2_result["secret_package"],
-			   r1_pkgs,
-			   r2pkgs
+			   self.round1_rec_packages,
+			   round2_packages
 		)
-
-		pubkey_package = {
-			"header": self.round3_result["pubkey_package"]["header"],
-			"verifying_key": self.round3_result["pubkey_package"]["verifying_key"],
-			"verifying_shares": {}
-		}
-		# convert frost ID to normal id
-		for id in self.partners:
-			frost_id = id_to_frost(self.key_type, id)
-			pubkey_package["verifying_shares"][id] = self.round3_result["pubkey_package"]["verifying_shares"][frost_id]
 		
 		result = {
 			"key_package": self.round3_result["key_package"],
-			"pubkey_package": pubkey_package,
+			"pubkey_package": self.round3_result["pubkey_package"],
 			"key_type": self.key_type,
 			"status": "SUCCESSFUL",
 		}
 		self.status = "COMPLETED"
 		return result
-
-
-def keys_to_frost(data: dict, crypto_module_type: KeyType) -> dict:
-	result = {}
-	for id in list(data.keys()):
-		result[id_to_frost(crypto_module_type, id)] = copy.deepcopy(data[id])
-	return result;
+	
 
 def verify_proof_of_knowledge(key_type: KeyType, id, commitments, signature):
 	return get_module(key_type).verify_proof_of_knowledge(
-		id_to_frost(key_type, id), 
+		id, 
 		commitments, 
 		signature
 	)
 
 def verify_dkg_secret_share(key_type: KeyType, id, secret_share, commitment):
 	return get_module(key_type).dkg_verify_secret_share(
-		id_to_frost(key_type, id), 
+		id, 
 		secret_share, 
 		commitment
 	);
@@ -172,14 +138,8 @@ def make_signature_share(
 		key_package
 ):
 	frost_module = get_module(key_type)
-	# convert normal ID into FrostID
-	party = list(nonces_commitments.keys())
-	commitments_map = {}
-	for id in party:
-		frost_id = id_to_frost(key_type, id);
-		commitments_map[frost_id] = nonces_commitments[id];
 	
-	signing_package = frost_module.signing_package_new(commitments_map, message);
+	signing_package = frost_module.signing_package_new(nonces_commitments, message);
 
 	return frost_module.round2_sign(
 			signing_package,
@@ -189,23 +149,18 @@ def make_signature_share(
 
 def verify_signature_share(
 	key_type: KeyType, 
-	node_id: int, 
+	node_id: str, 
 	message: bytes, 
 	signature_share: str, 
-	nonces_commitments: dict[int, str], 
+	commitments_map: dict[int, str], 
 	pubkey_package
 ) -> bool:
 	module = get_module(key_type)
-	identifier = id_to_frost(key_type, node_id)
-
-	commitments_map = {}
-	for id in list(nonces_commitments.keys()):
-		commitments_map[id_to_frost(key_type, id)] = nonces_commitments[id];
 
 	signing_package = module.signing_package_new(commitments_map, message);
 
 	return module.verify_share(
-		identifier, 
+		node_id, 
 		pubkey_package["verifying_shares"][node_id], 
 		signature_share, 
 		signing_package, 
@@ -232,14 +187,9 @@ def aggregate(key_type, message, commitments_map: dict, signature_shares: dict, 
 	module = get_module(key_type)
 	
 	signing_package = module.signing_package_new(
-		keys_to_frost(commitments_map, key_type), 
+		commitments_map, 
 		message
 	);
-
-	signature_shares = keys_to_frost(signature_shares, key_type)
-
-	pubkey_package = copy.deepcopy(pubkey_package)
-	pubkey_package["verifying_shares"] = keys_to_frost(pubkey_package["verifying_shares"], key_type)
 	
 	return module.aggregate(
 		signing_package, 
@@ -248,6 +198,4 @@ def aggregate(key_type, message, commitments_map: dict, signature_shares: dict, 
 	)
 
 def verify_group_signature(key_type, group_signature, message, pubkey_package):
-	pubkey_package = copy.deepcopy(pubkey_package);
-	pubkey_package["verifying_shares"] = keys_to_frost(pubkey_package["verifying_shares"], key_type);
 	return get_module(key_type).verify_group_signature(group_signature, message, pubkey_package)

@@ -37,7 +37,7 @@ async def run_sample(
 		return;
 
 	dkg_public_key = dkg_key["public_key"]
-	logging.info(f"dkg key: {dkg_key}")
+	logging.info(f"dkg key: {json.dumps(dkg_key, indent=4)}")
 
 	# for each signature we select a random subset
 	# only nonce[0] will be tested
@@ -46,6 +46,7 @@ async def run_sample(
 		selected_party = dkg_key["party"][:]
 		random.shuffle(selected_party)
 		selected_party = selected_party[:threshold]
+		logging.info(f"Signature selected party: {json.dumps(selected_party, indent=4)}")
 	
 		# Requesting nonce generation
 		nonces = {}

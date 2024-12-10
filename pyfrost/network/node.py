@@ -47,7 +47,7 @@ class Node:
 	def __init__(
 		self,
 		data_manager: DataManager,
-		node_id: int,
+		node_id: str,
 		private: int,
 		nodes_info: NodesInfo,
 		caller_validator: types.FunctionType,
@@ -55,7 +55,7 @@ class Node:
 	) -> None:
 		self.blueprint = Blueprint("pyfrost", __name__)
 		self.private = private
-		self.node_id = str(node_id)
+		self.node_id = node_id
 		self.key_gens: Dict[str, KeyGen] = {}
 
 		# TODO: Check validator functions if it cannot get as input. and just use in decorator.

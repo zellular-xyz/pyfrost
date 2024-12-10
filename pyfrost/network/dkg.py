@@ -14,10 +14,6 @@ import aiohttp
 def get_module(name):
 	return getattr(frost_lib, name)
 
-def ids_to_frost(key_type, party):
-	module = get_module(key_type);
-	return [module.num_to_id(int(id)) for id in party]
-
 async def post_request(url: str, data: Dict, timeout: int = 10):
 	async with aiohttp.ClientSession() as session:
 		async with session.post(url, json=data, timeout=timeout) as response:
@@ -51,7 +47,7 @@ class Dkg:
 		self, threshold: int, party: List, 
 		key_type: KeyType = "secp256k1"
 	) -> Dict:
-		logging.info(f"Requesting DKG with threshold: {threshold} and party: {party}")
+		logging.info(f"Requesting DKG with threshold: {threshold} and party: {json.dumps(party, indent=4)}")
 		dkg_id = str(uuid.uuid4())
 
 		if len(party) < threshold:
@@ -214,5 +210,5 @@ class Dkg:
 			"key_type": key_type,
 			"result": "SUCCESSFUL",
 		}
-		logging.info(f"DKG response: {response}")
+		logging.info(f"DKG response: {json.dumps(response, indent=4)}")
 		return response

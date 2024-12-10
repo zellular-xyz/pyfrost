@@ -12,6 +12,8 @@ VALIDATED_IPS = {
     ]
 }
 
+def num_to_hex(num: int, byte_len:int= 32) -> str:
+    return f"{num:0{byte_len*2}x}"
 
 def generate_privates_and_nodes_info(number: int = 100):
     first_private = (
@@ -29,7 +31,9 @@ def generate_privates_and_nodes_info(number: int = 100):
         compressed_pub_key = int(
             SEC1Encoder.encode_public_key(public_key, True).hex(), 16
         )
-        nodes_info_dict[str(i + 1)] = {
+        id = num_to_hex(i + 1);
+        nodes_info_dict[id] = {
+            "id": id,
             "public_key": compressed_pub_key,
             "host": "127.0.0.1",
             "port": str(5000 + i),
