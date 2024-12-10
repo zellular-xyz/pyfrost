@@ -1,6 +1,6 @@
 from pyfrost.crypto_utils import Polynomial
 from fastecdsa import keys
-from pyfrost import frost
+from pyfrost import dkg
 
 import pyfrost.crypto_utils as Utils
 import random
@@ -174,14 +174,14 @@ class Test(unittest.TestCase):
                     if nonce["id"] == id:
                         nonce_d = nonce["public_nonce_d"]
                         nonce_e = nonce["public_nonce_e"]
-                single_signature = frost.single_sign(
+                single_signature = dkg.single_sign(
                     id, share, nonce_d, nonce_e, message, nonces_dict, group_key
                 )
                 share_public_keys[id] = Utils.pub_to_code(
                     keys.get_public_key(share, Utils.ecurve)
                 )
                 signatures.append(single_signature)
-            group_nonce = frost.aggregate_nonce(message, nonces_dict)
+            group_nonce = dkg.aggregate_nonce(message, nonces_dict)
             for single_signature in signatures:
                 signature_data = {
                     "id": single_signature["id"],
@@ -193,15 +193,15 @@ class Test(unittest.TestCase):
                     "group_key": group_key,
                 }
                 self.assertTrue(
-                    frost.verify_single_signature(signature_data),
+                    dkg.verify_single_signature(signature_data),
                     f"FROST logic failed to verify single signature by node : {single_signature['id']}",
                 )
 
-            group_sign = frost.aggregate_signatures(
+            group_sign = dkg.aggregate_signatures(
                 message, signatures, group_nonce, group_key
             )
             self.assertTrue(
-                frost.verify_group_signature(group_sign),
+                dkg.verify_group_signature(group_sign),
                 f"FROST logic failed to verify group signature by selected nodes : {nodes_subset}",
             )
 

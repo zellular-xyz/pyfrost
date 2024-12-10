@@ -1,12 +1,12 @@
 from flask import Blueprint, request, jsonify, abort
 from functools import wraps
-from pyfrost.frost import KeyGen
+from pyfrost.dkg import KeyGen
 from ..crypto_utils import get_frost, decrypt_with_joint_key
 from typing import Dict
 from fastecdsa.encoding.sec1 import SEC1Encoder
 from fastecdsa import ecdsa, curve
 from .abstract import NodesInfo, DataManager
-from .. import frost
+from .. import dkg
 import json
 import logging
 import types

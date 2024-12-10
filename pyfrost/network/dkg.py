@@ -3,7 +3,7 @@ from fastecdsa import ecdsa, curve
 from fastecdsa.encoding.sec1 import SEC1Encoder
 from .abstract import NodesInfo
 import frost_lib
-from ..frost import KeyType
+from ..dkg import KeyType
 import logging
 import json
 import uuid

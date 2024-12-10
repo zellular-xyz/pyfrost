@@ -1,4 +1,4 @@
-from .frost import (
+from .dkg import (
     KeyGen,
 )
 from . import network

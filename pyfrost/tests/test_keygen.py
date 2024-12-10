@@ -115,7 +115,7 @@ class TestCaseKey(unittest.TestCase):
 			result["data"]["dkg_public_key"],
 		)
 		self.assertTrue(
-			pyfrost.frost.verify_group_signature(group_sign), "GROUP SIGNATURE FAILED"
+			pyfrost.dkg.verify_group_signature(group_sign), "GROUP SIGNATURE FAILED"
 		)
 
 
