@@ -2,7 +2,7 @@ from typing import List, Dict
 from fastecdsa.encoding.sec1 import SEC1Encoder
 from fastecdsa import curve
 from .abstract import NodesInfo
-from .dkg import post_request
+from .dkg_handler import post_request
 from ..crypto_utils import get_frost;
 import pyfrost
 import logging

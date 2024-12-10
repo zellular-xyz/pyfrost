@@ -3,16 +3,13 @@ from fastecdsa import ecdsa, curve
 from fastecdsa.encoding.sec1 import SEC1Encoder
 from .abstract import NodesInfo
 import frost_lib
-from ..dkg import KeyType
+from frost_lib.types import CurveType
 import logging
 import json
 import uuid
 import asyncio
 import aiohttp
 
-
-def get_module(name):
-	return getattr(frost_lib, name)
 
 async def post_request(url: str, data: Dict, timeout: int = 10):
 	async with aiohttp.ClientSession() as session:
@@ -30,22 +27,14 @@ async def post_request(url: str, data: Dict, timeout: int = 10):
 					"error": f"An exception occurred: {type(e).__name__}: {e}",
 				}
 
-class Dkg:
+class DkgHandler:
 	def __init__(self, nodes_info: NodesInfo, default_timeout: int = 200) -> None:
 		self.nodes_info: NodesInfo = nodes_info
 		self.default_timeout = default_timeout
 
-	def __gather_round2_data(self, node_id: str, data: Dict) -> List:
-		round2_data = []
-		for _, round_data in data.items():
-			for entry in round_data["send_to"]:
-				if entry["receiver_id"] == node_id:
-					round2_data.append(entry)
-		return round2_data
-
 	async def request_dkg(
 		self, threshold: int, party: List, 
-		key_type: KeyType = "secp256k1"
+		key_type: CurveType = "secp256k1"
 	) -> Dict:
 		logging.info(f"Requesting DKG with threshold: {threshold} and party: {json.dumps(party, indent=4)}")
 		dkg_id = str(uuid.uuid4())

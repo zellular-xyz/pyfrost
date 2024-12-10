@@ -1,5 +1,5 @@
 from pyfrost.network.sa import SA
-from pyfrost.network.dkg import Dkg
+from pyfrost.network.dkg_handler import DkgHandler
 from typing import List
 from abstracts import NodesInfo
 import logging, json, random
@@ -17,7 +17,7 @@ async def run_sample(
 ) -> None:
 	nodes_info = NodesInfo()
 	all_nodes = nodes_info.get_all_nodes(total_node_number)
-	dkg = Dkg(nodes_info, default_timeout=50)
+	dkg_handler = DkgHandler(nodes_info, default_timeout=50)
 	sa = SA(nodes_info, default_timeout=50)
 
 	# Random party selection:
@@ -27,7 +27,7 @@ async def run_sample(
 
 	# Requesting DKG:
 	now = timeit.default_timer()
-	dkg_key = await dkg.request_dkg(threshold, party)
+	dkg_key = await dkg_handler.request_dkg(threshold, party)
 	then = timeit.default_timer()
 
 	logging.info(f"Requesting DKG takes: {then - now} seconds.")

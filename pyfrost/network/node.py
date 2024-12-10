@@ -6,7 +6,6 @@ from typing import Dict
 from fastecdsa.encoding.sec1 import SEC1Encoder
 from fastecdsa import ecdsa, curve
 from .abstract import NodesInfo, DataManager
-from .. import dkg
 import json
 import logging
 import types

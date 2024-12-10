@@ -16,11 +16,11 @@ import json
 import base64
 from hashlib import sha256
 
-from typing import Optional
+from typing import Optional, Literal
 
 from web3 import Web3
 
-def get_frost(curve: str) -> frost_lib.CryptoModule:
+def get_frost(curve: frost_lib.types.CurveType) -> frost_lib.CryptoModule:
 	return getattr(frost_lib, curve)
 
 

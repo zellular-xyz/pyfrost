@@ -1,18 +1,15 @@
 from fastecdsa import keys
 from hashlib import sha256
 import frost_lib;
+from frost_lib.types import CurveType;
 from . import crypto_utils
 from typing import List, Dict, Tuple, Literal
 import json, copy
-
-KeyType = Literal ["ed25519", "secp256k1"]
-
-def get_module(name):
-	return getattr(frost_lib, name)
+from .crypto_utils import get_frost
 
 class KeyGen:
 	dkg_id: str
-	key_type: KeyType
+	key_type: CurveType
 	threshold: int
 	node_id: str
 	node_secret: int
@@ -35,7 +32,7 @@ class KeyGen:
 		node_secret: int,
 		partners: List[str],
 		partners_pub_keys: dict[str, int],
-		key_type: KeyType = "secp256k1",
+		key_type: CurveType = "secp256k1",
 	) -> None:
 		self.dkg_id = dkg_id
 		self.key_type = key_type
@@ -48,7 +45,7 @@ class KeyGen:
 		self.status = "STARTED"
 
 	def round1(self) -> Dict:
-		f_module = get_module(self.key_type)
+		f_module = get_frost(self.key_type)
 		self.round1_result = f_module.dkg_part1(
 			self.node_id,
 			len(self.partners),
@@ -65,7 +62,7 @@ class KeyGen:
 		return self.round1_result["package"]
 
 	def round2(self, round1_packages: dict[str, frost_lib.types.Part1PackageT]) -> list[dict]:
-		f_module = get_module(self.key_type);
+		f_module = get_frost(self.key_type);
 		
 		# store for later use
 		self.round1_rec_packages = round1_packages;
@@ -78,7 +75,7 @@ class KeyGen:
 			rec_pkgs[id] = round1_packages[id]
 
 		# call round 2
-		self.round2_result = get_module(self.key_type).dkg_part2(self.round1_result["secret_package"], rec_pkgs)
+		self.round2_result = get_frost(self.key_type).dkg_part2(self.round1_result["secret_package"], rec_pkgs)
 		result_data = {};
 		for id in self.partners:
 			if id == self.node_id:
@@ -100,7 +97,7 @@ class KeyGen:
 
 	def round3(self, round2_packages) -> Dict:				
 		# call native DKG part3
-		self.round3_result = get_module(self.key_type).dkg_part3(
+		self.round3_result = get_frost(self.key_type).dkg_part3(
 			   self.round2_result["secret_package"],
 			   self.round1_rec_packages,
 			   round2_packages
