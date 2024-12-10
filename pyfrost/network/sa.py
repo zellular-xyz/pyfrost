@@ -3,7 +3,7 @@ from fastecdsa.encoding.sec1 import SEC1Encoder
 from fastecdsa import curve
 from .abstract import NodesInfo
 from .dkg import post_request
-from .. import frost;
+from ..crypto_utils import get_frost;
 import pyfrost
 import logging
 import json
@@ -24,16 +24,20 @@ async def sign_request(url: str, dkg_key: Dict, data: Dict, timeout: int = 10):
 				msg = result["hash"]
 				node_id = data["node_id"]
 				nonces_commitments = data["nonces_dict"]
+				pubkey_package = dkg_key["pubkey_data"]["pubkey_package"]
 				
-				verified = frost.verify_signature_share(
-					key_type, 
-					node_id, 
-					msg, 
-					sign,
-					nonces_commitments,
-					dkg_key["pubkey_data"]["pubkey_package"]
+				signing_package = get_frost(key_type).signing_package_new(
+					signing_commitments= nonces_commitments, 
+					msg= msg
+				);
+				verified = get_frost(key_type).verify_share(
+					identifier= node_id, 
+					verifying_share= pubkey_package["verifying_shares"][node_id], 
+					signature_share= sign, 
+					signing_package= signing_package, 
+					verifying_key= pubkey_package["verifying_key"]
 				)
-				# verified = True;
+				
 				if not verified:
 					result["status"] = "MALICIOUS"
 				return result
@@ -81,7 +85,7 @@ class SA:
 	async def request_signature(
 		self, dkg_key: Dict, nonces_dict: Dict, sa_data: Dict, sign_party: List
 	) -> Dict:
-
+		key_type = dkg_key["key_type"]
 		call_method = self.nodes_info.prefix + "/v1/sign"
 		if not set(sign_party).issubset(set(dkg_key["party"])):
 			response = {"result": "FAILED", "signatures": None}
@@ -97,7 +101,7 @@ class SA:
 				url, dkg_key, 
 				{
 					"node_id": sign_party[i],
-					"key_type": dkg_key["key_type"],
+					"key_type": key_type,
 					"request_id": request_id,
 					"dkg_public_key": dkg_key["public_key"],
 					"nonces_dict": nonces_dict,
@@ -138,17 +142,19 @@ class SA:
 		))
 		hash = signatures[sign_party[0]]["hash"]
 
-		aggregated_sign = frost.aggregate(
-			key_type=dkg_key["key_type"],
-			message=hash,
-			commitments_map=commitments_map,
-			signature_shares=signature_shares,
-			pubkey_package=dkg_key["pubkey_data"]["pubkey_package"]
+		signing_package = get_frost(key_type).signing_package_new(
+			signing_commitments= commitments_map, 
+			msg= hash
+		);
+		aggregated_sign = get_frost(key_type).aggregate(
+			signing_package= signing_package,
+			signature_shares= signature_shares,
+			pubkey_package= dkg_key["pubkey_data"]["pubkey_package"]
 		)
 
 		aggregated_result = {}
 
-		if frost.verify_group_signature(dkg_key["key_type"], aggregated_sign, hash, dkg_key["pubkey_data"]["pubkey_package"]):
+		if get_frost(key_type).verify_group_signature(aggregated_sign, hash, dkg_key["pubkey_data"]["pubkey_package"]):
 			aggregated_result["message_hash"] = hash
 			aggregated_result["result"] = "SUCCESSFUL"
 			aggregated_result["request_id"] = request_id

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, abort
 from functools import wraps
-from pyfrost.frost import KeyGen, make_signature_share
-from pyfrost import crypto_utils, create_nonces
+from pyfrost.frost import KeyGen
+from ..crypto_utils import get_frost, decrypt_with_joint_key
 from typing import Dict
 from fastecdsa.encoding.sec1 import SEC1Encoder
 from fastecdsa import ecdsa, curve
@@ -41,7 +41,6 @@ def request_handler(func):
 			), 500
 
 	return wrapper
-
 
 class Node:
 	def __init__(
@@ -144,8 +143,7 @@ class Node:
 				for id in dkg_party:
 					if id == self.node_id:
 						continue;
-					proof_verified = frost.verify_proof_of_knowledge(
-						key_type=key_type, 
+					proof_verified = get_frost(key_type).verify_proof_of_knowledge( 
 						id=id,
 						commitments=whole_broadcasted_data[id]['broadcast']['commitment'],
 						signature=whole_broadcasted_data[id]['broadcast']['proof_of_knowledge']
@@ -170,7 +168,7 @@ class Node:
 
 		# decrypt send_data
 		for sender, data in send_data.items():
-			dec = crypto_utils.decrypt_with_joint_key(
+			dec = decrypt_with_joint_key(
 				data, 
 				self.private, 
 				self.nodes_info.lookup_node(sender)["public_key"]
@@ -187,8 +185,7 @@ class Node:
 					if sender == self.node_id:
 						continue
 
-					verified = frost.verify_dkg_secret_share(
-						key_type=key_gen.key_type,
+					verified = get_frost(key_gen.key_type).verify_dkg_secret_share(
 						id=self.node_id,
 						secret_share=send_data[sender]["signing_share"],
 						commitment=key_gen.round1_rec_packages[sender]["commitment"]
@@ -241,16 +238,25 @@ class Node:
 		request_id = data["request_id"]
 		result = self.data_validator(sa_data)
 		key_pair = self.data_manager.get_key(str(dkg_public_key))
+		key_type = key_pair["key_type"]
 		nonce_key = nonces_dict[self.node_id]["hiding"]
 		nonce = self.data_manager.get_nonce(nonce_key)
 
-		result["signature_data"] = make_signature_share(
-			key_pair["key_type"],
-			result["hash"],
-			nonces_dict,
-			nonce,
-			key_pair["key_package"]
-		);
+		signing_package = get_frost(key_type).signing_package_new(nonces_dict, result["hash"])
+		signature = signature = get_frost(key_type).round2_sign(
+			signing_package= signing_package,
+			signer_nonces= nonce,
+			key_package= key_pair["key_package"]
+		)
+
+		# # TODO: just for sign malicious detection test. remove it =========
+		# identifier = key_package["identifier"]
+		# if int(identifier, 16) == 3:
+		# 	print("========================= Malignant Behaviour ===============================")
+		# 	signature["share"] = signature["share"][:-1] + "0"
+		# # ================================================================
+
+		result["signature_data"] = signature
 		self.data_manager.remove_nonce(str(nonce_key))
 
 		result["status"] = "SUCCESSFUL"
@@ -264,12 +270,14 @@ class Node:
 		number_of_nonces = data["number_of_nonces"]
 
 		key_data = self.data_manager.get_key(dkg_pub_key);
+		key_type = key_data["key_type"]
 
-		nonces, commitments = create_nonces(
-			key_data["key_type"], 
-			key_data["key_package"]["signing_share"], 
-			number_of_nonces
-		)
+		nonces, commitments = [], []
+		for _ in range(number_of_nonces):
+			result = get_frost(key_type).round1_commit(key_data["key_package"]["signing_share"])
+			nonces.append(result["nonces"])
+			commitments.append(result["commitments"])
+		
 		for nonce in nonces:
 			self.data_manager.set_nonce(nonce["commitments"]["hiding"], nonce)
 

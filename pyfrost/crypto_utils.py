@@ -9,6 +9,7 @@ from fastecdsa import keys, curve
 from fastecdsa.curve import Curve
 from fastecdsa.point import Point
 from typing import List, Dict
+import frost_lib
 
 import math
 import json
@@ -18,6 +19,9 @@ from hashlib import sha256
 from typing import Optional
 
 from web3 import Web3
+
+def get_frost(curve: str) -> frost_lib.CryptoModule:
+	return getattr(frost_lib, curve)
 
 
 class Polynomial:
